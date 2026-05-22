@@ -54,7 +54,7 @@ None — can start immediately
 
 ## Task 2: IPC bridge + secure preload
 
-- [ ] Finished
+- [x] Finished
 
 ### What to build
 
@@ -86,11 +86,11 @@ Create the secure IPC communication layer between main and renderer processes. T
 
 ### Acceptance criteria
 
-- [ ] Preload script exposes typed IPC API on `window.electronAPI`
-- [ ] TypeScript types shared between main and renderer
-- [ ] contextIsolation is enabled, nodeIntegration is disabled
-- [ ] Renderer cannot access Node.js APIs directly
-- [ ] A simple test IPC call (e.g., get-monitors) round-trips successfully
+- [x] Preload script exposes typed IPC API on `window.electronAPI`
+- [x] TypeScript types shared between main and renderer
+- [x] contextIsolation is enabled, nodeIntegration is disabled
+- [x] Renderer cannot access Node.js APIs directly
+- [x] A simple test IPC call (e.g., get-monitors) round-trips successfully
 
 ### Blocked by
 
