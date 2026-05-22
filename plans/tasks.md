@@ -105,7 +105,7 @@ Create the secure IPC communication layer between main and renderer processes. T
 
 ## Task 3: Zustand stores + TanStack Query + app routing
 
-- [ ] Finished
+- [x] Finished
 
 ### What to build
 
@@ -133,11 +133,11 @@ Set up the state management layer and application-level view routing.
 
 ### Acceptance criteria
 
-- [ ] All three Zustand stores are functional with actions
-- [ ] TanStack Query provider wraps the app
-- [ ] App renders different placeholder screens based on currentView
-- [ ] Types match the existing backend data model (tab-revolver-web)
-- [ ] Hot reloading preserves store state
+- [x] All three Zustand stores are functional with actions
+- [x] TanStack Query provider wraps the app
+- [x] App renders different placeholder screens based on currentView
+- [x] Types match the existing backend data model (tab-revolver-web)
+- [x] Hot reloading preserves store state
 
 ### Blocked by
 
