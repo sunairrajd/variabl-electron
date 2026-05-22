@@ -1,4 +1,4 @@
-import { ipcMain, screen } from 'electron'
+import { app, ipcMain, screen } from 'electron'
 import type { MonitorInfo } from '../shared/ipc'
 
 function getMonitors(): MonitorInfo[] {
@@ -14,4 +14,5 @@ function getMonitors(): MonitorInfo[] {
 /** Registers every renderer→main handler. Call once after `app.whenReady()`. */
 export function registerIpcHandlers(): void {
   ipcMain.handle('get-monitors', () => getMonitors())
+  ipcMain.handle('get-app-version', () => app.getVersion())
 }

@@ -19,6 +19,7 @@ export interface SystemMemory {
 /** Request args and response type for every renderer→main `invoke` channel. */
 export interface IpcInvokeContract {
   'get-monitors': { args: []; result: MonitorInfo[] }
+  'get-app-version': { args: []; result: string }
   'get-system-memory': { args: []; result: SystemMemory }
   'set-display': { args: [displayId: number]; result: void }
   'show-website': { args: [url: string]; result: void }
@@ -36,6 +37,7 @@ export type InvokeResult<C extends InvokeChannel> = IpcInvokeContract[C]['result
 /** Runtime whitelist mirroring {@link IpcInvokeContract}. */
 export const INVOKE_CHANNELS = [
   'get-monitors',
+  'get-app-version',
   'get-system-memory',
   'set-display',
   'show-website',

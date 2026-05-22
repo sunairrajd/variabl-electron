@@ -152,7 +152,7 @@ Set up the state management layer and application-level view routing.
 
 ## Task 4: PIN + QR pairing screen UI
 
-- [ ] Finished
+- [x] Finished
 
 ### What to build
 
@@ -182,12 +182,12 @@ The first screen users see when the app boots on an unpaired device. Shows a QR 
 
 ### Acceptance criteria
 
-- [ ] QR code renders with a valid URL
-- [ ] 4-digit PIN input accepts only numbers
-- [ ] Submit button triggers pairing action (mocked)
-- [ ] Screen is visually polished with shadcn/ui + Tailwind
-- [ ] Responsive to different window sizes
-- [ ] Already-paired devices skip this screen
+- [x] QR code renders with a valid URL
+- [x] 4-digit PIN input accepts only numbers
+- [x] Submit button triggers pairing action (mocked)
+- [x] Screen is visually polished with shadcn/ui + Tailwind
+- [x] Responsive to different window sizes
+- [x] Already-paired devices skip this screen
 
 ### Blocked by
 
@@ -202,7 +202,7 @@ The first screen users see when the app boots on an unpaired device. Shows a QR 
 
 ## Task 5: Backend — POST /api/screens/auth endpoint
 
-- [ ] Finished
+- [x] Finished
 
 ### What to build
 
@@ -231,11 +231,11 @@ Error cases:
 
 ### Acceptance criteria
 
-- [ ] POST /api/screens/auth accepts deviceToken and returns Firebase custom token
-- [ ] Invalid deviceToken returns 401
-- [ ] Soft-deleted screen returns 404
-- [ ] Custom token includes screenId and isDevice claims
-- [ ] Endpoint works against the `tabrevdatabase` Firestore database
+- [x] POST /api/screens/auth accepts deviceToken and returns Firebase custom token
+- [x] Invalid deviceToken returns 401
+- [x] Soft-deleted screen returns 404
+- [x] Custom token includes screenId and isDevice claims
+- [x] Endpoint works against the `tabrevdatabase` Firestore database
 
 ### Blocked by
 
