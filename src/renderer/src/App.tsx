@@ -4,11 +4,14 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import PairingScreen from '@/screens/PairingScreen'
 import PlaylistPicker from '@/screens/PlaylistPicker'
 import PlayerScreen from '@/screens/PlayerScreen'
+import OnboardingScreen from '@/screens/OnboardingScreen'
+import PlayerOverlayScreen from '@/screens/PlayerOverlayScreen'
 
 const SCREENS = {
   pairing: PairingScreen,
   picker: PlaylistPicker,
-  player: PlayerScreen
+  player: PlayerScreen,
+  onboarding: OnboardingScreen,
 } as const
 
 function App(): React.JSX.Element {
@@ -31,6 +34,10 @@ function App(): React.JSX.Element {
         // No persisted token (or store IPC not yet wired) — stay on pairing.
       })
   }, [navigate, setDeviceToken])
+
+  if (window.location.hash === '#overlay') {
+    return <PlayerOverlayScreen />
+  }
 
   const Screen = SCREENS[currentView]
   return <Screen />

@@ -1,5 +1,7 @@
 import { app, ipcMain, screen } from 'electron'
 import type { MonitorInfo } from '../shared/ipc'
+import { stopPlayer } from './player'
+import { loadDashboard } from './index'
 
 function getMonitors(): MonitorInfo[] {
   const primaryId = screen.getPrimaryDisplay().id
@@ -12,7 +14,48 @@ function getMonitors(): MonitorInfo[] {
 }
 
 /** Registers every renderer→main handler. Call once after `app.whenReady()`. */
-export function registerIpcHandlers(): void {
+export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): void {
   ipcMain.handle('get-monitors', () => getMonitors())
   ipcMain.handle('get-app-version', () => app.getVersion())
+  ipcMain.handle('open-external', (_, url: string) => {
+    import('electron').then(({ shell }) => shell.openExternal(url))
+  })
+  
+  ipcMain.handle('stop-player', () => {
+    stopPlayer(loadDashboard)
+  })
+
+  ipcMain.handle('get-pending-auth-url', () => {
+    return getPendingAuthUrl ? getPendingAuthUrl() : null
+  })
+
+  ipcMain.handle('toggle-kiosk', (_, enabled: boolean) => {
+    import('electron').then(({ BrowserWindow }) => {
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+      if (mainWindow) {
+        mainWindow.setKiosk(enabled)
+      }
+    })
+  })
+
+  ipcMain.handle('store-get', () => {
+    // Stub to prevent frontend errors
+    return null
+  })
+
+  ipcMain.handle('fetch-playlists', async (_, baseUrl: string, token: string) => {
+    // Force the production domain tabrevolver.variabl.co
+    const url = 'https://tabrevolver.variabl.co/api/playlists'
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    })
+    if (!response.ok) {
+      throw new Error(`Failed to fetch playlists: ${response.status} ${response.statusText}`)
+    }
+    return response.json()
+  })
 }

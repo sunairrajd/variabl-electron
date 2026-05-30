@@ -28,6 +28,14 @@ export interface IpcInvokeContract {
   'store-set': { args: [key: string, value: unknown]; result: void }
   'app-restart': { args: []; result: void }
   'toggle-kiosk': { args: [enabled: boolean]; result: void }
+  'open-external': { args: [url: string]; result: void }
+  'fetch-playlists': { args: [baseUrl: string, token: string]; result: any }
+  'get-pending-auth-url': { args: []; result: string | null }
+  'start-player': { args: [playlist: any]; result: void }
+  'stop-player': { args: []; result: void }
+  'player-pause': { args: []; result: void }
+  'player-resume': { args: []; result: void }
+  'player-inactive': { args: []; result: void }
 }
 
 export type InvokeChannel = keyof IpcInvokeContract
@@ -45,14 +53,22 @@ export const INVOKE_CHANNELS = [
   'store-get',
   'store-set',
   'app-restart',
-  'toggle-kiosk'
+  'toggle-kiosk',
+  'open-external',
+  'fetch-playlists',
+  'get-pending-auth-url',
+  'start-player',
+  'stop-player',
+  'player-pause',
+  'player-resume',
+  'player-inactive'
 ] as const satisfies readonly InvokeChannel[]
 
 /** Fire-and-forget renderer→main channels — populated in later tasks. */
 export const SEND_CHANNELS: readonly string[] = []
 
 /** Main→renderer push-event channels — populated in later tasks. */
-export const EVENT_CHANNELS: readonly string[] = []
+export const EVENT_CHANNELS: readonly string[] = ['auth-url']
 
 // Compile-time guard: every contract channel must appear in INVOKE_CHANNELS.
 type UnlistedChannel = Exclude<InvokeChannel, (typeof INVOKE_CHANNELS)[number]>
