@@ -6,7 +6,7 @@ interface IntroStepProps {
 
 export default function IntroStep({ onNext }: IntroStepProps) {
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full bg-gradient-to-b from-white to-[#e0f2fe] p-12">
+    <div className="flex flex-col items-center justify-center w-full h-full p-12">
       <div className="text-center max-w-lg mb-8">
         <h1 className="text-3xl font-medium text-slate-800 mb-3 leading-tight">
           Turn any screen into a live dashboard or digital signage display

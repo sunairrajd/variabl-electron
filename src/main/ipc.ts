@@ -44,7 +44,7 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
   })
 
   ipcMain.handle('fetch-playlists', async (_, baseUrl: string, token: string) => {
-    // Force the production domain tabrevolver.variabl.co
+    // Always use production since the backend is not running locally
     const url = 'https://tabrevolver.variabl.co/api/playlists'
     const response = await fetch(url, {
       headers: {
@@ -55,6 +55,23 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
     })
     if (!response.ok) {
       throw new Error(`Failed to fetch playlists: ${response.status} ${response.statusText}`)
+    }
+    return response.json()
+  })
+
+  ipcMain.handle('sync-playlist', async (_, baseUrl: string, token: string, playlistId: string, tabs: any[]) => {
+    const url = `https://tabrevolver.variabl.co/api/playlists/${playlistId}`
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ tabs })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to sync playlist: ${response.status} ${response.statusText}`)
     }
     return response.json()
   })

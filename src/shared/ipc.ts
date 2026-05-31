@@ -30,6 +30,7 @@ export interface IpcInvokeContract {
   'toggle-kiosk': { args: [enabled: boolean]; result: void }
   'open-external': { args: [url: string]; result: void }
   'fetch-playlists': { args: [baseUrl: string, token: string]; result: any }
+  'sync-playlist': { args: [baseUrl: string, token: string, playlistId: string, tabs: any[]]; result: any }
   'get-pending-auth-url': { args: []; result: string | null }
   'start-player': { args: [playlist: any]; result: void }
   'stop-player': { args: []; result: void }
@@ -56,6 +57,7 @@ export const INVOKE_CHANNELS = [
   'toggle-kiosk',
   'open-external',
   'fetch-playlists',
+  'sync-playlist',
   'get-pending-auth-url',
   'start-player',
   'stop-player',

@@ -6,6 +6,8 @@ import PlaylistPickerStep from '@/screens/onboarding/PlaylistPickerStep'
 import ReadyStep from '@/screens/onboarding/ReadyStep'
 import { useAppStore } from '@/stores/useAppStore'
 
+import { AuroraBackground } from '@/components/ui/aurora-background'
+
 export type OnboardingStep = 'splash' | 'intro' | 'signin' | 'picker' | 'ready'
 
 export default function OnboardingScreen() {
@@ -13,7 +15,7 @@ export default function OnboardingScreen() {
   const navigate = useAppStore((s) => s.navigate)
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-white overflow-hidden">
+    <AuroraBackground className="w-full">
       {step === 'splash' && <SplashStep onNext={() => setStep('intro')} />}
       {step === 'intro' && <IntroStep onNext={() => setStep('signin')} />}
       {step === 'signin' && (
@@ -31,6 +33,7 @@ export default function OnboardingScreen() {
         />
       )}
       {step === 'ready' && <ReadyStep />}
-    </div>
+    </AuroraBackground>
   )
 }
+

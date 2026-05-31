@@ -19,7 +19,7 @@ function PairingScreen(): React.JSX.Element {
     window.electronAPI
       .invoke('get-app-version')
       .then(setAppVersion)
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   const pairingUrl = `${DASHBOARD_PAIRING_URL}?device=${deviceId}`
@@ -36,7 +36,7 @@ function PairingScreen(): React.JSX.Element {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-2xl border border-border bg-card p-10 shadow-xl">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          Tab Revolver Player
+          Variabl
         </h1>
 
         <div className="rounded-xl bg-white p-4">

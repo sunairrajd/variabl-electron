@@ -83,10 +83,10 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
   }
 
   return (
-    <div className="relative flex flex-col items-center w-full h-full bg-gradient-to-b from-white to-[#e0f2fe] p-12">
+    <div className="relative flex flex-col items-center w-full h-full p-12">
       <button 
         onClick={onBack}
-        className="absolute left-12 top-12 flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 transition-colors"
+        className="absolute left-12 top-12 flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 transition-[transform,colors] duration-[160ms] ease-emil-out active:scale-[0.85] cursor-pointer"
       >
         <ArrowLeft className="h-5 w-5 text-slate-600" />
       </button>
@@ -96,14 +96,14 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
           Sign in to sync your preferences & playlists across devices
         </h1>
         <p className="text-sm text-slate-400">
-          Import your Tab Revolver playlists and manage screens remotely.
+          Import your Variabl playlists and manage screens remotely.
         </p>
       </div>
       
       <div className="grid grid-cols-3 gap-4 mb-auto w-full max-w-3xl">
         {DUMMY_PLAYLISTS.map((playlist) => (
-          <div key={playlist.id} className="relative flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.06)] border border-slate-100">
-            <button className="absolute right-3 top-3 text-slate-300 hover:text-slate-500">
+          <div key={playlist.id} className="relative flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.06)] border border-slate-100 transition-transform duration-[160ms] ease-emil-out active:scale-[0.97] cursor-pointer">
+            <button className="absolute right-3 top-3 text-slate-300 hover:text-slate-500 transition-colors">
               <MoreHorizontal className="h-4 w-4" />
             </button>
             <div className="text-3xl mb-2">{playlist.emoji}</div>
@@ -169,7 +169,7 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
         ) : (
           <button 
             onClick={() => setShowManualInput(true)} 
-            className="text-xs text-slate-400 hover:text-slate-600 transition-colors mt-4 underline underline-offset-4 cursor-pointer"
+            className="text-xs text-slate-400 hover:text-slate-600 transition-[transform,colors] duration-[160ms] ease-emil-out active:scale-95 mt-4 underline underline-offset-4 cursor-pointer"
           >
             Trouble signing in? Paste token manually
           </button>

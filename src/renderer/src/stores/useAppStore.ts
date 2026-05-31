@@ -8,6 +8,11 @@ export interface PlaylistTab {
   title: string;
   type: string;
   url: string;
+  zoom?: number;
+  scroll?: {
+    enabled: boolean;
+    position: number;
+  };
 }
 
 export interface Playlist {

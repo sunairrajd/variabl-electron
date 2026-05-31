@@ -20,7 +20,6 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const deviceToken = useAuthStore((s) => s.deviceToken)
   const setSelectedPlaylist = useAppStore((s) => s.setSelectedPlaylist)
-  
   const baseUrl = 'https://tabrevolver.variabl.co'
 
   const { data: playlists, isLoading, error, refetch } = useQuery<Playlist[]>({
@@ -55,10 +54,10 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
   }, [playlists, selectedId])
 
   return (
-    <div className="relative flex flex-col items-center w-full h-full bg-gradient-to-b from-white to-[#e0f2fe] p-12">
+    <div className="relative flex flex-col items-center w-full h-full p-12">
       <button 
         onClick={onBack}
-        className="absolute left-12 top-12 flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 transition-colors"
+        className="absolute left-12 top-12 flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 transition-[transform,colors] duration-[160ms] ease-emil-out active:scale-[0.85] cursor-pointer"
       >
         <ArrowLeft className="h-5 w-5 text-slate-600" />
       </button>
@@ -93,7 +92,7 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
           <div className="text-4xl mb-2">📂</div>
           <p className="text-sm font-medium text-slate-800">No playlists found</p>
           <p className="text-xs text-slate-400">
-            Create playlists on the Tab Revolver website to display them here.
+            Create playlists on the Variabl website to display them here.
           </p>
         </div>
       )}
@@ -107,7 +106,7 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
               <button
                 key={playlist.id}
                 onClick={() => setSelectedId(playlist.id)}
-                className="group relative flex flex-col items-center"
+                className="group relative flex flex-col items-center transition-transform duration-[160ms] ease-emil-out active:scale-[0.95]"
               >
                 {isSelected && (
                   <div className="absolute -left-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#4a4a4a] text-white shadow-sm opacity-100 transition-opacity">

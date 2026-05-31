@@ -35,9 +35,7 @@ function App(): React.JSX.Element {
       })
   }, [navigate, setDeviceToken])
 
-  if (window.location.hash === '#overlay') {
-    return <PlayerOverlayScreen />
-  }
+
 
   const Screen = SCREENS[currentView]
   return <Screen />

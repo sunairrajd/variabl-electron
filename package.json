@@ -1,7 +1,7 @@
 {
-  "name": "tab-revolver-player",
+  "name": "variabl-player",
   "version": "1.0.0",
-  "description": "Tab Revolver Player — Digital Signage App",
+  "description": "Variabl Player — Digital Signage App",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -12,9 +12,12 @@
     "typecheck": "pnpm typecheck:node && pnpm typecheck:web"
   },
   "dependencies": {
+    "@fontsource/geist-mono": "^5.2.8",
+    "@fontsource/geist-sans": "^5.2.5",
     "@tanstack/react-query": "^5.100.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "firebase": "^12.14.0",
     "lucide-react": "^1.16.0",
     "qrcode.react": "^4.2.0",
     "radix-ui": "^1.4.3",

@@ -3,6 +3,8 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 
+app.setName('Variabl')
+
 export function loadDashboard() {
   const win = BrowserWindow.getAllWindows()[0]
   if (!win) return
@@ -21,6 +23,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#0a0a0a',
     titleBarStyle: 'hidden',
+    icon: join(__dirname, '../../resources/icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -82,6 +85,16 @@ app.whenReady().then(() => {
     .replace(/Electron\/[a-zA-Z0-9.-]+ /, '')
     .replace(/variabl electron app\/[a-zA-Z0-9.-]+ /, '')
   session.defaultSession.setUserAgent(cleanUserAgent)
+
+  // Set macOS dock icon in development/runtime
+  if (process.platform === 'darwin') {
+    const iconPath = join(__dirname, '../../resources/icon.png')
+    try {
+      app.dock?.setIcon(iconPath)
+    } catch (e) {
+      console.error('Failed to set dock icon:', e)
+    }
+  }
 
   registerIpcHandlers(() => {
     const url = pendingAuthUrl
