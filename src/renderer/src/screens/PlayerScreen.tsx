@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAppStore } from '@/stores/useAppStore'
+import { useAppStore, PlaylistTab } from '@/stores/useAppStore'
 import { Loader2 } from 'lucide-react'
 import PlayerOverlayScreen from './PlayerOverlayScreen'
 import { SyncService } from '@/services/SyncService'
+import RendererContainer from '@/components/renderers/RendererContainer'
+
+const isWebsiteTab = (tab: PlaylistTab | null) => {
+  if (!tab) return true;
+  return !['youtube', 'image', 'message', 'announcement', 'gsheet'].includes(tab.type) && !tab.faviconURL?.includes('youtube.com');
+}
 
 export default function PlayerScreen() {
   const navigate = useAppStore((s) => s.navigate)
@@ -15,7 +21,15 @@ export default function PlayerScreen() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [urlA, setUrlA] = useState<string>('')
   const [urlB, setUrlB] = useState<string>('')
+  const [tabA, setTabA] = useState<PlaylistTab | null>(null)
+  const [tabB, setTabB] = useState<PlaylistTab | null>(null)
+  const [renderKeyA, setRenderKeyA] = useState<number>(Date.now())
+  const [renderKeyB, setRenderKeyB] = useState<number>(Date.now())
   const [isPaused, setIsPaused] = useState(false)
+  const [firstTabLoaded, setFirstTabLoaded] = useState(false)
+
+  const onReadyCallbackRef = useRef<(() => void) | null>(null)
+  const onFailCallbackRef = useRef<(() => void) | null>(null)
 
   const handleExit = () => {
     window.electronAPI.invoke('stop-player')
@@ -24,12 +38,42 @@ export default function PlayerScreen() {
 
   useEffect(() => {
     if (selectedPlaylist?.tabs?.[0]) {
-      const initialUrl = selectedPlaylist.tabs[0].url.startsWith('http')
-        ? selectedPlaylist.tabs[0].url
-        : `https://${selectedPlaylist.tabs[0].url}`
-      setUrlA(initialUrl)
+      const initialTab = selectedPlaylist.tabs[0]
+      setTabA(initialTab)
+      setRenderKeyA(Date.now())
+      
+      if (isWebsiteTab(initialTab)) {
+        const initialUrl = initialTab.url.startsWith('http')
+          ? initialTab.url
+          : `https://${initialTab.url}`
+        setUrlA(initialUrl)
+
+        // Fallback to ensure loader fades out within 3 seconds
+        const timer = setTimeout(() => {
+          setFirstTabLoaded(true)
+        }, 3000)
+        return () => clearTimeout(timer)
+      }
     }
+    return undefined
   }, [selectedPlaylist])
+
+  useEffect(() => {
+    const wv = webviewARef.current
+    if (!wv) return
+
+    const handleLoad = () => {
+      setFirstTabLoaded(true)
+    }
+
+    wv.addEventListener('did-finish-load', handleLoad)
+    wv.addEventListener('did-fail-load', handleLoad)
+
+    return () => {
+      wv.removeEventListener('did-finish-load', handleLoad)
+      wv.removeEventListener('did-fail-load', handleLoad)
+    }
+  }, [urlA])
 
   const setSelectedPlaylist = useAppStore((s) => s.setSelectedPlaylist)
 
@@ -106,10 +150,16 @@ export default function PlayerScreen() {
     setIsRotating(true)
 
     const nextTab = selectedPlaylist.tabs[nextIndex]
-    const safeUrl = nextTab.url.startsWith('http') ? nextTab.url : `https://${nextTab.url}`
-
     const nextView = activeView === 0 ? 1 : 0
     const wv = nextView === 0 ? webviewARef.current : webviewBRef.current
+
+    if (nextView === 0) {
+      setTabA(nextTab)
+      setRenderKeyA(Date.now())
+    } else {
+      setTabB(nextTab)
+      setRenderKeyB(Date.now())
+    }
 
     // Clear the auto-rotation timer immediately
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -120,35 +170,94 @@ export default function PlayerScreen() {
       rotationTimeoutRef.current = null
     }
 
-    if (wv) {
-      const applyTabSettings = () => {
-        if (nextTab.zoom) wv.setZoomFactor(nextTab.zoom)
-        else wv.setZoomFactor(1)
+    if (isWebsiteTab(nextTab)) {
+      let safeUrl = nextTab.url.startsWith('http') ? nextTab.url : `https://${nextTab.url}`
 
-        const disableScrollJS = `
-          window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
-          window.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-          const style = document.createElement('style');
-          style.innerHTML = '::-webkit-scrollbar { display: none !important; }';
-          document.head.appendChild(style);
-        `
-        wv.executeJavaScript(disableScrollJS).catch(console.error)
+      if (wv) {
+        const applyTabSettings = () => {
+          if (nextTab.zoom) wv.setZoomFactor(nextTab.zoom)
+          else wv.setZoomFactor(1)
 
-        if (nextTab.scroll?.enabled && nextTab.scroll?.position) {
-          wv.executeJavaScript(`window.scrollTo({ top: ${nextTab.scroll.position}, behavior: 'instant' })`)
+          const disableScrollJS = `
+            window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+            window.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+            const style = document.createElement('style');
+            style.innerHTML = '::-webkit-scrollbar { display: none !important; }';
+            document.head.appendChild(style);
+          `
+          wv.executeJavaScript(disableScrollJS).catch(console.error)
+
+          if (nextTab.scroll?.enabled && nextTab.scroll?.position) {
+            wv.executeJavaScript(`window.scrollTo({ top: ${nextTab.scroll.position}, behavior: 'instant' })`)
+          }
         }
-      }
 
-      const onFinishLoad = () => {
+        const onFinishLoad = () => {
+          if (rotationTimeoutRef.current) {
+            clearTimeout(rotationTimeoutRef.current)
+            rotationTimeoutRef.current = null
+          }
+          wv.removeEventListener('did-finish-load', onFinishLoad)
+          wv.removeEventListener('did-fail-load', onFailLoad)
+
+          applyTabSettings()
+          setTimeout(() => {
+            setActiveView(nextView)
+            setCurrentIndex(nextIndex)
+            setIsRotating(false)
+          }, 100)
+        }
+
+        const onFailLoad = () => {
+          if (rotationTimeoutRef.current) {
+            clearTimeout(rotationTimeoutRef.current)
+            rotationTimeoutRef.current = null
+          }
+          wv.removeEventListener('did-finish-load', onFinishLoad)
+          wv.removeEventListener('did-fail-load', onFailLoad)
+
+          applyTabSettings()
+          setActiveView(nextView)
+          setCurrentIndex(nextIndex)
+          setIsRotating(false)
+        }
+
+        wv.addEventListener('did-finish-load', onFinishLoad)
+        wv.addEventListener('did-fail-load', onFailLoad)
+
+        rotationTimeoutRef.current = setTimeout(() => {
+          wv.removeEventListener('did-finish-load', onFinishLoad)
+          wv.removeEventListener('did-fail-load', onFailLoad)
+
+          applyTabSettings()
+          setActiveView(nextView)
+          setCurrentIndex(nextIndex)
+          setIsRotating(false)
+        }, 3000)
+
+        if (nextView === 0) setUrlA(safeUrl)
+        else setUrlB(safeUrl)
+
+        try {
+          wv.loadURL(safeUrl)
+        } catch (e) {
+          console.error('Failed to load URL directly:', e)
+        }
+
+      } else {
+        setActiveView(nextView)
+        setCurrentIndex(nextIndex)
+        if (nextView === 0) setUrlA(safeUrl)
+        else setUrlB(safeUrl)
+        setIsRotating(false)
+      }
+    } else {
+      // Internal Renderer
+      onReadyCallbackRef.current = () => {
         if (rotationTimeoutRef.current) {
           clearTimeout(rotationTimeoutRef.current)
           rotationTimeoutRef.current = null
         }
-        wv.removeEventListener('did-finish-load', onFinishLoad)
-        wv.removeEventListener('did-fail-load', onFinishLoad)
-
-        applyTabSettings()
-        // Wait just a tiny bit for the paint to catch up before swapping opacity
         setTimeout(() => {
           setActiveView(nextView)
           setCurrentIndex(nextIndex)
@@ -156,36 +265,24 @@ export default function PlayerScreen() {
         }, 100)
       }
 
-      wv.addEventListener('did-finish-load', onFinishLoad)
-      wv.addEventListener('did-fail-load', onFinishLoad) // If it fails (e.g. adblock or ERR_FAILED), skip crossfade hang
-
-      // Fallback timeout in case load takes too long
-      rotationTimeoutRef.current = setTimeout(() => {
-        wv.removeEventListener('did-finish-load', onFinishLoad)
-        wv.removeEventListener('did-fail-load', onFinishLoad)
-
-        applyTabSettings()
+      onFailCallbackRef.current = () => {
+        if (rotationTimeoutRef.current) {
+          clearTimeout(rotationTimeoutRef.current)
+          rotationTimeoutRef.current = null
+        }
         setActiveView(nextView)
         setCurrentIndex(nextIndex)
         setIsRotating(false)
-      }, 3000)
-
-      if (nextView === 0) setUrlA(safeUrl)
-      else setUrlB(safeUrl)
-
-      // Force navigation in case the URL string is identical but we need a reload
-      try {
-        wv.loadURL(safeUrl)
-      } catch (e) {
-        console.error('Failed to load URL directly:', e)
+        
+        setTimeout(() => {
+          const skipIndex = (nextIndex + 1) % selectedPlaylist.tabs.length
+          triggerRotation(skipIndex, true)
+        }, 2000)
       }
 
-    } else {
-      setActiveView(nextView)
-      setCurrentIndex(nextIndex)
-      if (nextView === 0) setUrlA(safeUrl)
-      else setUrlB(safeUrl)
-      setIsRotating(false)
+      rotationTimeoutRef.current = setTimeout(() => {
+        if (onFailCallbackRef.current) onFailCallbackRef.current()
+      }, 5000)
     }
   }
 
@@ -195,16 +292,21 @@ export default function PlayerScreen() {
 
     const currentTab = selectedPlaylist.tabs[currentIndex]
     const isFixed = selectedPlaylist.rotationType === 'fixed'
-    const intervalSecs = isFixed
-      ? (selectedPlaylist.defaultInterval || 30)
-      : (currentTab.interval || selectedPlaylist.defaultInterval || 30)
+    
+    const isYouTube = currentTab.type === 'youtube' || currentTab.faviconURL?.includes('youtube.com')
+
+    const intervalMs = isYouTube
+      ? (currentTab.interval || 30) * 1000
+      : (isFixed
+        ? (selectedPlaylist.defaultInterval || 30) * 1000
+        : (currentTab.interval || selectedPlaylist.defaultInterval || 30) * 1000)
 
     if (timerRef.current) clearTimeout(timerRef.current)
 
     timerRef.current = setTimeout(() => {
       const nextIndex = (currentIndex + 1) % selectedPlaylist.tabs.length
       triggerRotation(nextIndex)
-    }, intervalSecs * 1000)
+    }, intervalMs)
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
@@ -228,21 +330,68 @@ export default function PlayerScreen() {
       <webview
         ref={webviewARef}
         src={urlA || undefined}
-        className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+        className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 && isWebsiteTab(tabA) ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
           }`}
       />
+      
+      <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 && !isWebsiteTab(tabA) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+        {!isWebsiteTab(tabA) && (
+          <RendererContainer 
+            key={renderKeyA}
+            tab={tabA} 
+            isActive={activeView === 0}
+            isPaused={isPaused}
+            onFinish={handleNext} 
+            onReady={() => {
+              setFirstTabLoaded(true)
+              if (activeView !== 0) onReadyCallbackRef.current?.()
+            }} 
+            onFail={() => {
+              setFirstTabLoaded(true)
+              if (activeView !== 0) onFailCallbackRef.current?.()
+            }} 
+          />
+        )}
+      </div>
+
       <webview
         ref={webviewBRef}
         src={urlB || undefined}
-        className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+        className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 && isWebsiteTab(tabB) ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
           }`}
       />
 
-      {(!urlA && !urlB) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black z-20 pointer-events-none">
-          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-        </div>
-      )}
+      <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 && !isWebsiteTab(tabB) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+        {!isWebsiteTab(tabB) && (
+          <RendererContainer 
+            key={renderKeyB}
+            tab={tabB} 
+            isActive={activeView === 1}
+            isPaused={isPaused}
+            onFinish={handleNext} 
+            onReady={() => {
+              setFirstTabLoaded(true)
+              if (activeView !== 1) onReadyCallbackRef.current?.()
+            }} 
+            onFail={() => {
+              setFirstTabLoaded(true)
+              if (activeView !== 1) onFailCallbackRef.current?.()
+            }} 
+          />
+        )}
+      </div>
+
+      {/* "Your screen is ready" beautiful preloader overlay */}
+      <div 
+        className={`absolute inset-0 flex flex-col items-center justify-center bg-black z-50 transition-opacity duration-1000 ease-in-out pointer-events-none ${
+          firstTabLoaded ? 'opacity-0' : 'opacity-100'
+        }`}
+      >
+        <h1 className="text-2xl font-medium bg-gradient-to-r from-[#84cc16] via-[#3b82f6] to-[#8b5cf6] bg-clip-text text-transparent animate-pulse mb-4">
+          Your screen is ready
+        </h1>
+        <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+      </div>
 
       <PlayerOverlayScreen
         playlistName={selectedPlaylist?.name || 'My Playlist'}

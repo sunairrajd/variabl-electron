@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, MoreHorizontal } from 'lucide-react'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { db, doc, setDoc, rtdb, rtdbRef, rtdbSet } from '@/lib/firebase'
 
 interface SignInStepProps {
   onNext: () => void
@@ -22,25 +23,60 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
   const [showManualInput, setShowManualInput] = useState(false)
   const [manualToken, setManualToken] = useState('')
 
-  const handleUrl = (url: unknown) => {
+  const handleUrl = async (url: unknown) => {
     if (typeof url === 'string') {
       try {
+        let tokenToUse = ''
         // Handle full deep link tabrevolver://auth?token=... OR just a raw token string
         if (url.startsWith('tabrevolver://') || url.includes('token=')) {
           const parsedUrl = new URL(url.replace('tabrevolver://', 'https://'))
           const token = parsedUrl.searchParams.get('token')
           if (token) {
-            console.log('[SignInStep] Successfully parsed token from auth URL')
-            setDeviceToken(token)
-            onNext()
-            return
+            tokenToUse = token
           }
+        } else if (url.trim().length > 20) {
+          tokenToUse = url.trim()
         }
-        
-        // Treat as raw token
-        if (url.trim().length > 20) {
-          console.log('[SignInStep] Using manual input as raw token')
-          setDeviceToken(url.trim())
+
+        if (tokenToUse) {
+          setDeviceToken(tokenToUse)
+          
+          // Try to register the screen in Firebase Realtime Database
+          try {
+            const { screenName, displayId } = useAuthStore.getState()
+            if (screenName && displayId) {
+              let userId = ''
+              try {
+                // Attempt to decode JWT to get uid/user_id
+                const payload = JSON.parse(atob(tokenToUse.split('.')[1]))
+                userId = payload.uid || payload.user_id || ''
+              } catch (e) {
+                console.warn('Could not decode token for userId')
+              }
+              
+              const now = Date.now()
+              const screenData = {
+                createdAt: now,
+                displayId: displayId,
+                lastSeen: now,
+                nowPlayingPlaylistId: "",
+                screenName: screenName,
+                updatedAt: now,
+                userId: userId
+              }
+
+              // Write to Firebase Realtime Database
+              await rtdbSet(rtdbRef(rtdb, `screens/${displayId}`), screenData)
+              
+              // Also write to Firestore just in case both are used
+              await setDoc(doc(db, 'screens', displayId), screenData, { merge: true })
+              
+              console.log('[SignInStep] Successfully registered screen in Database')
+            }
+          } catch (err) {
+            console.error('[SignInStep] Failed to save screen to Database:', err)
+          }
+
           onNext()
         }
       } catch (err) {
@@ -83,7 +119,7 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
   }
 
   return (
-    <div className="relative flex flex-col items-center w-full h-full p-12">
+    <div className="relative flex flex-col items-center w-full h-full p-12 opacity-0 animate-screen-enter">
       <button 
         onClick={onBack}
         className="absolute left-12 top-12 flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 transition-[transform,colors] duration-[160ms] ease-emil-out active:scale-[0.85] cursor-pointer"

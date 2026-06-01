@@ -6,6 +6,8 @@
   --font-sans: 'Geist Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
 
+  --breakpoint-4k: 2560px;
+
   --ease-emil-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-emil-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
@@ -48,6 +50,32 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   --animate-aurora: aurora 30s linear infinite;
+  --animate-reveal: reveal 3000ms var(--ease-emil-out) forwards;
+  --animate-screen-enter: screen-enter 2000ms var(--ease-emil-out) forwards;
+
+  @keyframes screen-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.95);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 
   @keyframes aurora {
     from {

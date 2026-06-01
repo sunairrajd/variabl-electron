@@ -54,7 +54,7 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
   }, [playlists, selectedId])
 
   return (
-    <div className="relative flex flex-col items-center w-full h-full p-12">
+    <div className="relative flex flex-col items-center w-full h-full p-12 opacity-0 animate-screen-enter">
       <button 
         onClick={onBack}
         className="absolute left-12 top-12 flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 transition-[transform,colors] duration-[160ms] ease-emil-out active:scale-[0.85] cursor-pointer"

@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app'
-import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore'
+import { getFirestore, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore'
+import { getDatabase, ref as rtdbRef, set as rtdbSet, update as rtdbUpdate } from 'firebase/database'
 
 const firebaseConfig = {
   apiKey: "AIzaSyDNlZbJZU5PywQ9S91CZR7O8_WonjAfecc",
@@ -15,5 +16,6 @@ const FIRESTORE_DATABASE_ID = 'tabrevdatabase'
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0]
 const db = getFirestore(app, FIRESTORE_DATABASE_ID)
+const rtdb = getDatabase(app)
 
-export { db, doc, updateDoc, getDoc }
+export { db, doc, updateDoc, getDoc, setDoc, rtdb, rtdbRef, rtdbSet, rtdbUpdate }

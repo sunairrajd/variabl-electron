@@ -12,17 +12,23 @@ export interface AuthUser {
 interface AuthState {
   deviceToken: string | null
   firebaseUser: AuthUser | null
+  screenName: string | null
+  displayId: string | null
   setDeviceToken: (token: string | null) => void
   setFirebaseUser: (user: AuthUser | null) => void
+  setScreenData: (screenName: string, displayId: string) => void
   logout: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   deviceToken: null,
   firebaseUser: null,
+  screenName: null,
+  displayId: null,
   setDeviceToken: (deviceToken) => set({ deviceToken }),
   setFirebaseUser: (firebaseUser) => set({ firebaseUser }),
-  logout: () => set({ deviceToken: null, firebaseUser: null })
+  setScreenData: (screenName, displayId) => set({ screenName, displayId }),
+  logout: () => set({ deviceToken: null, firebaseUser: null, screenName: null, displayId: null })
 }))
 
 /** Derived: the device has completed Firebase sign-in. */

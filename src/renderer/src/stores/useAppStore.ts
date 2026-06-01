@@ -13,6 +13,13 @@ export interface PlaylistTab {
     enabled: boolean;
     position: number;
   };
+  mute?: boolean;
+  thumbnailURL?: string;
+  faviconURL?: string;
+  backgroundColor?: string;
+  fontColor?: string;
+  scale?: string;
+  message?: string;
 }
 
 export interface Playlist {
