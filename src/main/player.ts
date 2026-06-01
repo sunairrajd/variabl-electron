@@ -1,6 +1,6 @@
 import { BrowserWindow, globalShortcut } from 'electron'
 
-export function stopPlayer(loadDashboard: () => void) {
+export function stopPlayer() {
   globalShortcut.unregister('Escape')
 
   const mainWindow = BrowserWindow.getAllWindows()[0]
@@ -9,6 +9,4 @@ export function stopPlayer(loadDashboard: () => void) {
       mainWindow.setKiosk(false)
     }
   }
-
-  loadDashboard()
 }

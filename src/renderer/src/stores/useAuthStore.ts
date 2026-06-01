@@ -20,15 +20,47 @@ interface AuthState {
   logout: () => void
 }
 
+const getLocalStorageItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key)
+  } catch (e) {
+    return null
+  }
+}
+
+const setLocalStorageItem = (key: string, value: string | null) => {
+  try {
+    if (value === null) {
+      localStorage.removeItem(key)
+    } else {
+      localStorage.setItem(key, value)
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
-  deviceToken: null,
+  deviceToken: getLocalStorageItem('deviceToken'),
   firebaseUser: null,
-  screenName: null,
-  displayId: null,
-  setDeviceToken: (deviceToken) => set({ deviceToken }),
+  screenName: getLocalStorageItem('screenName'),
+  displayId: getLocalStorageItem('displayId'),
+  setDeviceToken: (deviceToken) => {
+    setLocalStorageItem('deviceToken', deviceToken)
+    set({ deviceToken })
+  },
   setFirebaseUser: (firebaseUser) => set({ firebaseUser }),
-  setScreenData: (screenName, displayId) => set({ screenName, displayId }),
-  logout: () => set({ deviceToken: null, firebaseUser: null, screenName: null, displayId: null })
+  setScreenData: (screenName, displayId) => {
+    setLocalStorageItem('screenName', screenName)
+    setLocalStorageItem('displayId', displayId)
+    set({ screenName, displayId })
+  },
+  logout: () => {
+    setLocalStorageItem('deviceToken', null)
+    setLocalStorageItem('screenName', null)
+    setLocalStorageItem('displayId', null)
+    set({ deviceToken: null, firebaseUser: null, screenName: null, displayId: null })
+  }
 }))
 
 /** Derived: the device has completed Firebase sign-in. */

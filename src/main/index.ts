@@ -63,7 +63,11 @@ app.on('open-url', (event, url) => {
   }
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (process.argv.includes('--reset') || process.env.RESET_DATA === 'true') {
+    console.log('[Main] Factory Reset requested. Wiping all app data...')
+    await session.defaultSession.clearStorageData()
+  }
   // Global anti-embedding bypass for strict websites (Google, Amazon, etc.)
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = { ...details.responseHeaders }
@@ -95,6 +99,48 @@ app.whenReady().then(() => {
       console.error('Failed to set dock icon:', e)
     }
   }
+
+  app.on('web-contents-created', (_, contents) => {
+    contents.setWindowOpenHandler(({ url }) => {
+      console.log('[Main] webview requested popup for URL:', url)
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+      
+      const authWindow = new BrowserWindow({
+        width: 500,
+        height: 700,
+        parent: mainWindow,
+        alwaysOnTop: true,
+        focusable: true,
+        autoHideMenuBar: true,
+        webPreferences: {
+          session: contents.session // Use the SAME session partition as the webview
+        }
+      })
+
+      authWindow.loadURL(url)
+
+      if (mainWindow) {
+        mainWindow.webContents.send('auth-window-state', true)
+      }
+
+      authWindow.on('closed', () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('auth-window-state', false)
+        }
+      })
+
+      authWindow.webContents.on('did-navigate', (_, navUrl) => {
+        console.log('[Main] authWindow did-navigate to:', navUrl)
+        if (navUrl.includes('mail.google.com') && !navUrl.includes('accounts.google.com')) {
+          console.log('[Main] Closing auth window due to did-navigate matching mail.google.com')
+          authWindow.close()
+          contents.reload()
+        }
+      })
+
+      return { action: 'deny' }
+    })
+  })
 
   registerIpcHandlers(() => {
     const url = pendingAuthUrl

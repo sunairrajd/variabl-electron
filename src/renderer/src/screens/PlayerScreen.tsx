@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAppStore, PlaylistTab } from '@/stores/useAppStore'
+import { useAppStore, PlaylistTab, Playlist } from '@/stores/useAppStore'
 import { Loader2 } from 'lucide-react'
 import PlayerOverlayScreen from './PlayerOverlayScreen'
 import { SyncService } from '@/services/SyncService'
 import RendererContainer from '@/components/renderers/RendererContainer'
+import { rtdb, rtdbRef, rtdbUpdate } from '@/lib/firebase'
+import { onValue } from 'firebase/database'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { GradientWaveText } from '@/components/ui/gradient-wave-text'
 
 const isWebsiteTab = (tab: PlaylistTab | null) => {
   if (!tab) return true;
@@ -13,9 +17,74 @@ const isWebsiteTab = (tab: PlaylistTab | null) => {
 export default function PlayerScreen() {
   const navigate = useAppStore((s) => s.navigate)
   const selectedPlaylist = useAppStore((s) => s.selectedPlaylist)
+  const displayId = useAuthStore((s) => s.displayId)
   const webviewARef = useRef<any>(null)
+
+  useEffect(() => {
+    if (!displayId || !selectedPlaylist?.id) return
+
+    const updateNowPlaying = async (playlistId: string) => {
+      try {
+        await rtdbUpdate(rtdbRef(rtdb, `screens/${displayId}`), {
+          nowPlayingPlaylistId: playlistId,
+          updatedAt: Date.now()
+        })
+        console.log(`[PlayerScreen] Updated nowPlayingPlaylistId to ${playlistId}`)
+      } catch (err) {
+        console.error('[PlayerScreen] Failed to update nowPlayingPlaylistId in RTDB:', err)
+      }
+    }
+
+    updateNowPlaying(selectedPlaylist.id)
+
+    return () => {
+      // When playlist stops playing, clear nowPlayingPlaylistId
+      rtdbUpdate(rtdbRef(rtdb, `screens/${displayId}`), {
+        nowPlayingPlaylistId: "",
+        updatedAt: Date.now()
+      }).catch((err) => {
+        console.error('[PlayerScreen] Failed to clear nowPlayingPlaylistId in RTDB:', err)
+      })
+    }
+  }, [displayId, selectedPlaylist?.id])
+
+  const pendingPlaylistUpdateRef = useRef<Playlist | null>(null)
+
+  useEffect(() => {
+    if (!selectedPlaylist?.id || !displayId) return
+    
+    const playlistRef = rtdbRef(rtdb, `playlists/${selectedPlaylist.id}`)
+    const unsubscribe = onValue(playlistRef, async (snapshot) => {
+      const val = snapshot.val()
+      if (!val) return
+
+      // Ignore updates we made ourselves
+      if (val.updatedBy === `screen_${displayId}`) return
+
+      console.log('[PlayerScreen] Playlist update signaled in RTDB, fetching latest...')
+      try {
+        const baseUrl = 'https://tabrevolver.variabl.co'
+        const deviceToken = useAuthStore.getState().deviceToken
+        if (!deviceToken) return
+        
+        const updatedPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, deviceToken)
+        const freshPlaylist = updatedPlaylists.find((p: any) => p.id === selectedPlaylist.id)
+        if (freshPlaylist) {
+          console.log('[PlayerScreen] Playlist fetched, staging for next loop...')
+          pendingPlaylistUpdateRef.current = freshPlaylist
+        }
+      } catch (err) {
+        console.error('[PlayerScreen] Failed to fetch updated playlist:', err)
+      }
+    })
+
+    return () => unsubscribe()
+  }, [selectedPlaylist?.id, displayId])
+  
   const webviewBRef = useRef<any>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const preloadTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const backgroundTabReadyRef = useRef(false)
 
   const [activeView, setActiveView] = useState(0)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -27,13 +96,14 @@ export default function PlayerScreen() {
   const [renderKeyB, setRenderKeyB] = useState<number>(Date.now())
   const [isPaused, setIsPaused] = useState(false)
   const [firstTabLoaded, setFirstTabLoaded] = useState(false)
+  const [countdown, setCountdown] = useState(10)
 
   const onReadyCallbackRef = useRef<(() => void) | null>(null)
   const onFailCallbackRef = useRef<(() => void) | null>(null)
 
   const handleExit = () => {
     window.electronAPI.invoke('stop-player')
-    navigate('picker')
+    navigate('inactive')
   }
 
   useEffect(() => {
@@ -41,39 +111,48 @@ export default function PlayerScreen() {
       const initialTab = selectedPlaylist.tabs[0]
       setTabA(initialTab)
       setRenderKeyA(Date.now())
-      
+
       if (isWebsiteTab(initialTab)) {
         const initialUrl = initialTab.url.startsWith('http')
           ? initialTab.url
           : `https://${initialTab.url}`
         setUrlA(initialUrl)
-
-        // Fallback to ensure loader fades out within 3 seconds
-        const timer = setTimeout(() => {
-          setFirstTabLoaded(true)
-        }, 3000)
-        return () => clearTimeout(timer)
       }
+
+      // Preload the second tab if it exists
+      if (selectedPlaylist.tabs.length > 1) {
+        const secondTab = selectedPlaylist.tabs[1]
+        setTabB(secondTab)
+        setRenderKeyB(Date.now())
+        if (isWebsiteTab(secondTab)) {
+          const secondUrl = secondTab.url.startsWith('http')
+            ? secondTab.url
+            : `https://${secondTab.url}`
+          setUrlB(secondUrl)
+        }
+      }
+
+      setCountdown(10)
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            setFirstTabLoaded(true)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+      return () => clearInterval(timer)
     }
     return undefined
-  }, [selectedPlaylist])
-
+  }, [selectedPlaylist?.id])
   useEffect(() => {
-    const wv = webviewARef.current
-    if (!wv) return
-
-    const handleLoad = () => {
-      setFirstTabLoaded(true)
-    }
-
-    wv.addEventListener('did-finish-load', handleLoad)
-    wv.addEventListener('did-fail-load', handleLoad)
-
-    return () => {
-      wv.removeEventListener('did-finish-load', handleLoad)
-      wv.removeEventListener('did-fail-load', handleLoad)
-    }
-  }, [urlA])
+    const cleanup = window.electronAPI.on('auth-window-state', (isOpen) => {
+      setIsPaused(isOpen as boolean)
+    })
+    return cleanup
+  }, [])
 
   const setSelectedPlaylist = useAppStore((s) => s.setSelectedPlaylist)
 
@@ -98,7 +177,9 @@ export default function PlayerScreen() {
           }
         }
         updatedTabs[currentIndex] = updatedTab
-        setSelectedPlaylist({ ...selectedPlaylist, tabs: updatedTabs })
+        const newPlaylist = { ...selectedPlaylist, tabs: updatedTabs }
+        setSelectedPlaylist(newPlaylist)
+        SyncService.syncPlaylistSettings(newPlaylist)
       }
     }
   }
@@ -119,7 +200,9 @@ export default function PlayerScreen() {
       if (wv) {
         wv.setZoomFactor(factor)
         updatedTabs[currentIndex] = updatedTab
-        setSelectedPlaylist({ ...selectedPlaylist, tabs: updatedTabs })
+        const newPlaylist = { ...selectedPlaylist, tabs: updatedTabs }
+        setSelectedPlaylist(newPlaylist)
+        SyncService.syncPlaylistSettings(newPlaylist)
       }
     }
   }
@@ -144,12 +227,21 @@ export default function PlayerScreen() {
   const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const triggerRotation = (nextIndex: number, force = false) => {
-    if (!selectedPlaylist?.tabs) return
+    const pendingUpdate = pendingPlaylistUpdateRef.current
+    const actualPlaylist = (pendingUpdate && nextIndex === 0) ? pendingUpdate : selectedPlaylist
+    
+    if (!actualPlaylist?.tabs) return
     if (isRotating && !force) return // Prevent overlapping rotations unless forced (manual skip)
+
+    if (pendingUpdate && nextIndex === 0) {
+      setSelectedPlaylist(pendingUpdate)
+      pendingPlaylistUpdateRef.current = null
+      console.log('[PlayerScreen] Applied staged playlist update on new loop')
+    }
 
     setIsRotating(true)
 
-    const nextTab = selectedPlaylist.tabs[nextIndex]
+    const nextTab = actualPlaylist.tabs[nextIndex]
     const nextView = activeView === 0 ? 1 : 0
     const wv = nextView === 0 ? webviewARef.current : webviewBRef.current
 
@@ -235,8 +327,22 @@ export default function PlayerScreen() {
           setIsRotating(false)
         }, 3000)
 
-        if (nextView === 0) setUrlA(safeUrl)
-        else setUrlB(safeUrl)
+        const isAlreadyLoaded = (nextView === 0 && urlA === safeUrl) || (nextView === 1 && urlB === safeUrl)
+
+        if (!isAlreadyLoaded) {
+          if (nextView === 0) setUrlA(safeUrl)
+          else setUrlB(safeUrl)
+        }
+
+        if (isAlreadyLoaded) {
+          applyTabSettings()
+          setTimeout(() => {
+            setActiveView(nextView)
+            setCurrentIndex(nextIndex)
+            setIsRotating(false)
+          }, 100)
+          return
+        }
 
         try {
           wv.loadURL(safeUrl)
@@ -253,6 +359,21 @@ export default function PlayerScreen() {
       }
     } else {
       // Internal Renderer
+      const isAlreadyPreloaded = (nextView === 0 && tabA === nextTab) || (nextView === 1 && tabB === nextTab)
+
+      if (isAlreadyPreloaded && backgroundTabReadyRef.current) {
+        if (rotationTimeoutRef.current) {
+          clearTimeout(rotationTimeoutRef.current)
+          rotationTimeoutRef.current = null
+        }
+        setTimeout(() => {
+          setActiveView(nextView)
+          setCurrentIndex(nextIndex)
+          setIsRotating(false)
+        }, 100)
+        return
+      }
+
       onReadyCallbackRef.current = () => {
         if (rotationTimeoutRef.current) {
           clearTimeout(rotationTimeoutRef.current)
@@ -273,9 +394,9 @@ export default function PlayerScreen() {
         setActiveView(nextView)
         setCurrentIndex(nextIndex)
         setIsRotating(false)
-        
+
         setTimeout(() => {
-          const skipIndex = (nextIndex + 1) % selectedPlaylist.tabs.length
+          const skipIndex = (nextIndex + 1) % actualPlaylist.tabs.length
           triggerRotation(skipIndex, true)
         }, 2000)
       }
@@ -288,11 +409,11 @@ export default function PlayerScreen() {
 
   useEffect(() => {
     if (!selectedPlaylist?.tabs || selectedPlaylist.tabs.length === 0) return
-    if (isPaused || isRotating) return
+    if (isPaused || isRotating || !firstTabLoaded) return
 
     const currentTab = selectedPlaylist.tabs[currentIndex]
     const isFixed = selectedPlaylist.rotationType === 'fixed'
-    
+
     const isYouTube = currentTab.type === 'youtube' || currentTab.faviconURL?.includes('youtube.com')
 
     const intervalMs = isYouTube
@@ -301,7 +422,32 @@ export default function PlayerScreen() {
         ? (selectedPlaylist.defaultInterval || 30) * 1000
         : (currentTab.interval || selectedPlaylist.defaultInterval || 30) * 1000)
 
+    const preloadMs = Math.max(0, intervalMs - 5000)
+
     if (timerRef.current) clearTimeout(timerRef.current)
+    if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
+
+    preloadTimerRef.current = setTimeout(() => {
+      const nextIndex = (currentIndex + 1) % selectedPlaylist.tabs.length
+      const nextTab = selectedPlaylist.tabs[nextIndex]
+      const nextView = activeView === 0 ? 1 : 0
+
+      if (isWebsiteTab(nextTab)) {
+        backgroundTabReadyRef.current = false
+
+        if (nextView === 0) {
+          setTabA(nextTab)
+          setRenderKeyA(Date.now())
+        } else {
+          setTabB(nextTab)
+          setRenderKeyB(Date.now())
+        }
+
+        let safeUrl = nextTab.url.startsWith('http') ? nextTab.url : `https://${nextTab.url}`
+        if (nextView === 0) setUrlA(safeUrl)
+        else setUrlB(safeUrl)
+      }
+    }, preloadMs)
 
     timerRef.current = setTimeout(() => {
       const nextIndex = (currentIndex + 1) % selectedPlaylist.tabs.length
@@ -310,8 +456,9 @@ export default function PlayerScreen() {
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
+      if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
     }
-  }, [currentIndex, isPaused, activeView, selectedPlaylist, isRotating])
+  }, [currentIndex, isPaused, activeView, selectedPlaylist, isRotating, firstTabLoaded])
 
   const handleNext = () => {
     if (!selectedPlaylist?.tabs) return
@@ -325,92 +472,150 @@ export default function PlayerScreen() {
     triggerRotation(prevIndex, true)
   }
 
+  const determineCanScroll = (tab: PlaylistTab | null | undefined): boolean => {
+    if (!tab) return true;
+    const isUnscrollableType = ['youtube', 'image', 'announcement', 'message'].includes(tab.type);
+    const isYouTubeUrl = tab.url?.includes('youtube.com') || tab.faviconURL?.includes('youtube.com');
+    return !isUnscrollableType && !isYouTubeUrl;
+  }
+
+  const determineCanZoom = (tab: PlaylistTab | null | undefined): boolean => {
+    return determineCanScroll(tab) && !tab?.url?.toLowerCase().includes('looker');
+  }
+
+  const currentTabToRender = selectedPlaylist?.tabs?.[currentIndex];
+  const canScroll = determineCanScroll(currentTabToRender);
+  const canZoom = determineCanZoom(currentTabToRender);
+
+  const totalDurationSeconds = selectedPlaylist?.tabs?.reduce((acc, tab) => {
+    const isYouTube = tab.type === 'youtube' || tab.faviconURL?.includes('youtube.com')
+    const isFixed = selectedPlaylist?.rotationType === 'fixed'
+    const interval = isYouTube
+      ? (tab.interval || 30)
+      : (isFixed
+        ? (selectedPlaylist?.defaultInterval || 30)
+        : (tab.interval || selectedPlaylist?.defaultInterval || 30))
+    return acc + interval
+  }, 0) || 0
+
   return (
-    <div className="relative h-screen w-screen bg-black overflow-hidden">
-      <webview
-        ref={webviewARef}
-        src={urlA || undefined}
-        className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 && isWebsiteTab(tabA) ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
-          }`}
-      />
-      
-      <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 && !isWebsiteTab(tabA) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-        {!isWebsiteTab(tabA) && (
-          <RendererContainer 
-            key={renderKeyA}
-            tab={tabA} 
-            isActive={activeView === 0}
-            isPaused={isPaused}
-            onFinish={handleNext} 
-            onReady={() => {
-              setFirstTabLoaded(true)
-              if (activeView !== 0) onReadyCallbackRef.current?.()
-            }} 
-            onFail={() => {
-              setFirstTabLoaded(true)
-              if (activeView !== 0) onFailCallbackRef.current?.()
-            }} 
+    <div className="relative w-screen h-screen bg-black overflow-hidden select-none">
+      <div className="absolute inset-0 h-full w-full">
+        {isWebsiteTab(tabA) && (
+          <webview
+            ref={(el) => {
+              webviewARef.current = el;
+              if (el) el.setAttribute('allowpopups', '');
+            }}
+            src={urlA || undefined}
+            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${
+              activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+            }`}
           />
         )}
-      </div>
+        
+        <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 && !isWebsiteTab(tabA) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          {!isWebsiteTab(tabA) && (
+            <RendererContainer
+              key={renderKeyA}
+              tab={tabA}
+              isActive={activeView === 0}
+              isPaused={isPaused}
+              onFinish={handleNext}
+              onReady={() => {
+                if (activeView !== 0) {
+                  backgroundTabReadyRef.current = true
+                  onReadyCallbackRef.current?.()
+                }
+              }}
+              onFail={() => {
+                if (activeView !== 0) {
+                  backgroundTabReadyRef.current = true
+                  onFailCallbackRef.current?.()
+                }
+              }}
+            />
+          )}
+        </div>
 
-      <webview
-        ref={webviewBRef}
-        src={urlB || undefined}
-        className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 && isWebsiteTab(tabB) ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
-          }`}
-      />
-
-      <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 && !isWebsiteTab(tabB) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-        {!isWebsiteTab(tabB) && (
-          <RendererContainer 
-            key={renderKeyB}
-            tab={tabB} 
-            isActive={activeView === 1}
-            isPaused={isPaused}
-            onFinish={handleNext} 
-            onReady={() => {
-              setFirstTabLoaded(true)
-              if (activeView !== 1) onReadyCallbackRef.current?.()
-            }} 
-            onFail={() => {
-              setFirstTabLoaded(true)
-              if (activeView !== 1) onFailCallbackRef.current?.()
-            }} 
+        {isWebsiteTab(tabB) && (
+          <webview
+            ref={(el) => {
+              webviewBRef.current = el;
+              if (el) el.setAttribute('allowpopups', '');
+            }}
+            src={urlB || undefined}
+            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${
+              activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+            }`}
           />
         )}
+
+        <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 && !isWebsiteTab(tabB) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          {!isWebsiteTab(tabB) && (
+            <RendererContainer
+              key={renderKeyB}
+              tab={tabB}
+              isActive={activeView === 1}
+              isPaused={isPaused}
+              onFinish={handleNext}
+              onReady={() => {
+                if (activeView !== 1) {
+                  backgroundTabReadyRef.current = true
+                  onReadyCallbackRef.current?.()
+                }
+              }}
+              onFail={() => {
+                if (activeView !== 1) {
+                  backgroundTabReadyRef.current = true
+                  onFailCallbackRef.current?.()
+                }
+              }}
+            />
+          )}
+        </div>
       </div>
 
-      {/* "Your screen is ready" beautiful preloader overlay */}
-      <div 
-        className={`absolute inset-0 flex flex-col items-center justify-center bg-black z-50 transition-opacity duration-1000 ease-in-out pointer-events-none ${
-          firstTabLoaded ? 'opacity-0' : 'opacity-100'
-        }`}
+      <div
+        className={`absolute inset-0 flex flex-col items-center justify-center bg-black z-50 transition-opacity duration-1000 ease-in-out pointer-events-none ${firstTabLoaded ? 'opacity-0' : 'opacity-100'
+          }`}
       >
-        <h1 className="text-2xl font-medium bg-gradient-to-r from-[#84cc16] via-[#3b82f6] to-[#8b5cf6] bg-clip-text text-transparent animate-pulse mb-4">
-          Your screen is ready
-        </h1>
-        <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+        <GradientWaveText
+          className="text-xl font-medium mb-4 h-auto w-auto [--gradient-wave-base:rgb(255,255,255)]"
+          customColors={["#DAFA51", "#3b82f6", "#8b5cf6"]}
+          speed={1}
+          repeat={true}
+        >
+          Your screen is getting ready
+        </GradientWaveText>
+        <div className="text-xl font-mono text-white/90 mb-6">
+          00:{countdown.toString().padStart(2, '0')}
+        </div>
       </div>
 
-      <PlayerOverlayScreen
-        playlistName={selectedPlaylist?.name || 'My Playlist'}
-        tabCount={selectedPlaylist?.tabs?.length || 0}
-        currentIndex={currentIndex}
-        currentTabName={selectedPlaylist?.tabs?.[currentIndex]?.title || selectedPlaylist?.tabs?.[currentIndex]?.url || ''}
-        isPaused={isPaused}
-        isNavigating={isRotating}
-        onPause={() => setIsPaused(true)}
-        onResume={() => setIsPaused(false)}
-        onNext={handleNext}
-        onPrev={handlePrev}
-        onExit={handleExit}
-        onScroll={handleScroll}
-        onSaveScroll={handleSaveScroll}
-        onZoom={handleZoom}
-        onSaveZoom={handleSaveZoom}
-        onFullscreenToggle={handleFullscreenToggle}
-      />
+      {firstTabLoaded && (
+        <PlayerOverlayScreen
+          playlistName={selectedPlaylist?.name || 'My Playlist'}
+          tabCount={selectedPlaylist?.tabs?.length || 0}
+          currentIndex={currentIndex}
+          currentTabName={selectedPlaylist?.tabs?.[currentIndex]?.title || selectedPlaylist?.tabs?.[currentIndex]?.url || ''}
+          isPaused={isPaused}
+          isNavigating={isRotating}
+          onPause={() => setIsPaused(true)}
+          onResume={() => setIsPaused(false)}
+          onNext={handleNext}
+          onPrev={handlePrev}
+          onExit={handleExit}
+          onScroll={handleScroll}
+          onSaveScroll={handleSaveScroll}
+          onZoom={handleZoom}
+          onSaveZoom={handleSaveZoom}
+          onFullscreenToggle={handleFullscreenToggle}
+          canScroll={canScroll}
+          canZoom={canZoom}
+          durationSeconds={totalDurationSeconds}
+        />
+      )}
     </div>
   )
 }

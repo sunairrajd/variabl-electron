@@ -1,7 +1,6 @@
 import { app, ipcMain, screen } from 'electron'
 import type { MonitorInfo } from '../shared/ipc'
 import { stopPlayer } from './player'
-import { loadDashboard } from './index'
 
 function getMonitors(): MonitorInfo[] {
   const primaryId = screen.getPrimaryDisplay().id
@@ -22,7 +21,7 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
   })
   
   ipcMain.handle('stop-player', () => {
-    stopPlayer(loadDashboard)
+    stopPlayer()
   })
 
   ipcMain.handle('get-pending-auth-url', () => {

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 /** Top-level screen the app is currently showing. */
-export type AppView = 'pairing' | 'picker' | 'player' | 'onboarding'
+export type AppView = 'pairing' | 'picker' | 'player' | 'onboarding' | 'inactive'
 
 export interface PlaylistTab {
   interval: number;

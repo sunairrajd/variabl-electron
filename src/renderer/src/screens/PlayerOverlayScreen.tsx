@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { Play, Pause, SkipForward, SkipBack, X, Search, Maximize, Link2, ArrowUp, ArrowDown, ZoomIn, ArrowUpDown } from 'lucide-react'
+import scrollIcon from '@/assets/scroll.svg'
 
 interface PlayerOverlayScreenProps {
   playlistName: string
@@ -18,6 +19,9 @@ interface PlayerOverlayScreenProps {
   onZoom: (factor: number) => void
   onSaveZoom: () => void
   onFullscreenToggle: () => void
+  canScroll: boolean
+  canZoom: boolean
+  durationSeconds: number
 }
 
 export default function PlayerOverlayScreen({
@@ -36,7 +40,10 @@ export default function PlayerOverlayScreen({
   onSaveScroll,
   onZoom,
   onSaveZoom,
-  onFullscreenToggle
+  onFullscreenToggle,
+  canScroll,
+  canZoom,
+  durationSeconds
 }: PlayerOverlayScreenProps) {
   const [isVisible, setIsVisible] = useState(false)
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -128,13 +135,19 @@ export default function PlayerOverlayScreen({
           </button>
         </div>
 
-        <div className="flex flex-col gap-1 pt-0.5">
-          <p className="text-[11px] text-white/80 font-medium">Now playing: {displayUrl}</p>
+        <div className="flex flex-col gap-1 pt-0.5 min-w-0">
+          <p className="text-[11px] text-white/80 font-medium truncate" title={`Now playing: ${displayUrl}`}>Now playing: {displayUrl}</p>
           <h1 className="text-[20px] leading-tight font-bold text-white tracking-tight drop-shadow-sm truncate">
             {playlistName || 'Unknown Playlist'}
           </h1>
           <p className="text-[11px] text-white/80 font-medium">
-            {tabCount} tabs . {Math.round((tabCount * 30) / 60)}m duration
+            {tabCount} {tabCount === 1 ? 'tab' : 'tabs'} • {(() => {
+              const mins = Math.floor(durationSeconds / 60)
+              const secs = durationSeconds % 60
+              if (mins === 0) return `${secs}s`
+              if (secs === 0) return `${mins}m`
+              return `${mins}m ${secs}s`
+            })()} duration
           </p>
         </div>
 
@@ -200,14 +213,21 @@ export default function PlayerOverlayScreen({
         {/* Scroll Dropdown Container */}
         <div className="relative flex">
           <button
-            onClick={() => setActiveDropdown(activeDropdown === 'scroll' ? null : 'scroll')}
+            onClick={() => canScroll && setActiveDropdown(activeDropdown === 'scroll' ? null : 'scroll')}
             title="Scroll Position"
-            className={`flex h-14 w-[72px] items-center justify-center rounded-[20px] shadow-sm transition hover:scale-105 active:scale-95 ${activeDropdown === 'scroll' ? 'bg-gray-200' : 'bg-white hover:bg-gray-50'}`}
+            disabled={!canScroll}
+            className={`flex h-14 w-[72px] items-center justify-center rounded-[20px] shadow-sm transition ${
+              !canScroll 
+                ? 'opacity-40 cursor-not-allowed bg-white/50' 
+                : activeDropdown === 'scroll' 
+                  ? 'bg-gray-200 hover:scale-105 active:scale-95' 
+                  : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
+            }`}
           >
-            <ArrowUpDown className="h-6 w-6 text-black" strokeWidth={2.5} />
+            <img src={scrollIcon} className="h-6 w-6" alt="Scroll" />
           </button>
           
-          {activeDropdown === 'scroll' && (
+          {activeDropdown === 'scroll' && canScroll && (
             <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 flex flex-col gap-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 p-3 shadow-xl items-center">
               <div className="flex gap-2">
                 <button 
@@ -242,16 +262,23 @@ export default function PlayerOverlayScreen({
         {/* Zoom Dropdown Container */}
         <div className="relative flex">
           <button
-            onClick={() => setActiveDropdown(activeDropdown === 'zoom' ? null : 'zoom')}
+            onClick={() => canZoom && setActiveDropdown(activeDropdown === 'zoom' ? null : 'zoom')}
             title="Zoom Level"
-            className={`flex h-14 w-[72px] items-center justify-center rounded-[20px] shadow-sm transition hover:scale-105 active:scale-95 ${activeDropdown === 'zoom' ? 'bg-gray-200' : 'bg-white hover:bg-gray-50'}`}
+            disabled={!canZoom}
+            className={`flex h-14 w-[72px] items-center justify-center rounded-[20px] shadow-sm transition ${
+              !canZoom
+                ? 'opacity-40 cursor-not-allowed bg-white/50'
+                : activeDropdown === 'zoom'
+                  ? 'bg-gray-200 hover:scale-105 active:scale-95'
+                  : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
+            }`}
           >
             <ZoomIn className="h-6 w-6 text-black" strokeWidth={2.5} />
           </button>
 
-          {activeDropdown === 'zoom' && (
+          {activeDropdown === 'zoom' && canZoom && (
             <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 flex flex-col gap-1.5 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 p-2.5 shadow-xl w-32">
-              {[50, 75, 100, 125, 150, 200].map((level) => (
+              {[25, 50, 75, 100, 125, 150, 200].map((level) => (
                 <button
                   key={level}
                   onClick={() => onZoom(level / 100)}

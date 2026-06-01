@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Check, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useAppStore, type Playlist } from '@/stores/useAppStore'
@@ -9,9 +9,6 @@ interface PlaylistPickerStepProps {
   onNext: () => void
   onBack: () => void
 }
-
-// Playlist interface imported from useAppStore
-
 
 const EMOJIS = ['🌱', '🔥', '🏀', '🍒', '🚀', '🦖', '📂', '💡', '🎵', '⚡️']
 const getEmoji = (index: number) => EMOJIS[index % EMOJIS.length]
@@ -54,83 +51,123 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
   }, [playlists, selectedId])
 
   return (
-    <div className="relative flex flex-col items-center w-full h-full p-12 opacity-0 animate-screen-enter">
-      <button 
-        onClick={onBack}
-        className="absolute left-12 top-12 flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 transition-[transform,colors] duration-[160ms] ease-emil-out active:scale-[0.85] cursor-pointer"
-      >
-        <ArrowLeft className="h-5 w-5 text-slate-600" />
-      </button>
-
-      <div className="text-center max-w-md mt-8 mb-16">
-        <h1 className="text-3xl font-medium text-slate-800 mb-3 leading-tight">
-          Choose a playlist to start
-        </h1>
-        <p className="text-sm text-slate-400">
-          choose a playlist to start displaying content instantly.
-        </p>
-      </div>
-      
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center mb-auto gap-3 py-12">
-          <Loader2 className="h-8 w-8 text-slate-500 animate-spin" />
-          <p className="text-sm text-slate-500">Loading your playlists...</p>
+    <div className="flex flex-col justify-between items-center w-full h-full p-[3vw] opacity-0 animate-screen-enter">
+      {/* Pinned Header Spacer & Title Area */}
+      <div className="w-full flex flex-col items-center">
+        <div className="w-full flex items-center justify-between">
+          <div className="h-[clamp(2.5rem,3.2vw,4.5rem)] w-[clamp(2.5rem,3.2vw,4.5rem)] opacity-0" />
+          <div className="h-[clamp(2.5rem,3.2vw,4.5rem)]" />
         </div>
-      )}
 
-      {error && (
-        <div className="flex flex-col items-center justify-center mb-auto gap-3 py-12 max-w-sm text-center">
-          <p className="text-sm text-red-500">Error: {(error as Error).message || 'Failed to load playlists'}</p>
-          <Button onClick={() => refetch()} variant="outline" className="rounded-full mt-4 h-9">
-            Retry
-          </Button>
-        </div>
-      )}
-
-      {!isLoading && !error && (!playlists || playlists.length === 0) && (
-        <div className="flex flex-col items-center justify-center mb-auto gap-3 py-12 max-w-sm text-center">
-          <div className="text-4xl mb-2">📂</div>
-          <p className="text-sm font-medium text-slate-800">No playlists found</p>
-          <p className="text-xs text-slate-400">
-            Create playlists on the Variabl website to display them here.
+        <div className="text-center max-w-[45vw] min-w-[320px] mt-[1vw]">
+          <h1 className="text-[clamp(1.2rem,2vw,2.8rem)] font-light text-slate-700 mb-[1vw] tracking-[-1px] leading-[1.1]">
+            Choose a playlist to start
+          </h1>
+          <p className="text-[clamp(0.75rem,0.9vw,1.2rem)] font-normal text-slate-400">
+            Select a playlist to start displaying content instantly
           </p>
         </div>
-      )}
+      </div>
 
-      {!isLoading && !error && playlists && playlists.length > 0 && (
-        <div className="flex gap-8 mb-auto flex-wrap justify-center max-w-4xl">
-          {playlists.map((playlist, idx) => {
-            const isSelected = selectedId === playlist.id
-            const emoji = getEmoji(idx)
-            return (
-              <button
-                key={playlist.id}
-                onClick={() => setSelectedId(playlist.id)}
-                className="group relative flex flex-col items-center transition-transform duration-[160ms] ease-emil-out active:scale-[0.95]"
+      {/* Centered Content */}
+      <div className="flex flex-col items-center justify-center flex-1 my-[2vw] w-full max-w-[80vw]">
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center gap-[1vw]">
+            <Loader2 className="h-[clamp(1.5rem,2vw,2.5rem)] w-[clamp(1.5rem,2vw,2.5rem)] text-slate-500 animate-spin" />
+            <p className="text-[clamp(0.75rem,0.9vw,1.2rem)] text-slate-500">Loading your playlists...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex flex-col items-center justify-center gap-[1vw] text-center">
+            <p className="text-[clamp(0.75rem,0.9vw,1.2rem)] text-red-500">Error: {(error as Error).message || 'Failed to load playlists'}</p>
+            <Button onClick={() => refetch()} variant="outline" className="rounded-full mt-[1vw] h-[clamp(2rem,2.5vw,3rem)] text-[clamp(0.75rem,0.9vw,1.1rem)]">
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {!isLoading && !error && (!playlists || playlists.length === 0) && (
+          <div className="flex flex-col items-center justify-center gap-[0.5vw] text-center">
+            <div className="text-[clamp(2rem,3vw,4rem)] mb-[0.25vw]">📂</div>
+            <p className="text-[clamp(0.75rem,0.9vw,1.5rem)] font-normal text-slate-800">No playlists found</p>
+            <p className="text-[clamp(1rem,1.2vw,1.5rem)] text-slate-400 mt-[0.05vw]">
+              Create your first playlist at{' '}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  window.electronAPI.invoke('open-external', 'https://variabl.co/app')
+                }}
+                className="underline hover:text-slate-600 transition-colors cursor-pointer"
               >
-                {isSelected && (
-                  <div className="absolute -left-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#4a4a4a] text-white shadow-sm opacity-100 transition-opacity">
-                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                variabl.co/app
+              </a>
+              {' '}to display them here
+            </p>
+          </div>
+        )}
+
+        {!isLoading && !error && playlists && playlists.length > 0 && (
+          <div className="flex gap-[1.5vw] flex-wrap justify-center overflow-y-auto max-h-[50vh] p-[1vw] pb-[3vw] hide-scrollbar w-full">
+            {playlists.map((playlist, idx) => {
+              const isSelected = selectedId === playlist.id
+              const emoji = playlist.emoji || '🌱'
+
+              const totalSeconds = playlist.tabs?.reduce((acc, tab) => {
+                const isYouTube = tab.type === 'youtube' || tab.faviconURL?.includes('youtube.com')
+                const isFixed = playlist.rotationType === 'fixed'
+                const interval = isYouTube
+                  ? (tab.interval || 30)
+                  : (isFixed
+                    ? (playlist.defaultInterval || 30)
+                    : (tab.interval || playlist.defaultInterval || 30))
+                return acc + interval
+              }, 0) || 0
+
+              const minutes = Math.floor(totalSeconds / 60)
+              const seconds = totalSeconds % 60
+              const totalDuration = minutes > 0 ? `${minutes}m ${seconds > 0 ? `${seconds}s` : ''}` : `${seconds}s`
+
+              const tabsCount = playlist.tabs?.length || 0
+
+              return (
+                <button
+                  key={playlist.id}
+                  onClick={() => setSelectedId(playlist.id)}
+                  className={`bg-white rounded-[1.2vw] border-1 active:border-2  px-[1.5vw] pt-[2vw] pb-[2vw] transition-all duration-300 ease-out relative cursor-pointer flex flex-col items-center w-[clamp(160px,16vw,260px)] group ${isSelected
+                    ? 'border-gray-400 shadow-[0_12px_32px_rgba(0,0,0,0.08)] scale-[1.02]'
+                    : 'border-gray-200 border-1  active:border-2 hover:shadow-[0_12px_32px_rgba(0,0,0,0.04)] hover:border-gray-300 hover:-translate-y-[0.3vw] active:scale-[0.98] active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,0,0,0.02)]'
+                    }`}
+                  style={{ fontFamily: 'var(--font-geist-sans)' }}
+                >
+                  {/* Emoji */}
+                  <div className="mb-[1vw] transform group-hover:scale-110 transition-transform duration-300 ease-out">
+                    <span className="text-[clamp(1.5rem,2.2vw,3rem)]">{emoji}</span>
                   </div>
-                )}
-                
-                <div className={`relative flex h-32 w-32 flex-col items-center justify-center rounded-full bg-white transition-shadow ${isSelected ? 'shadow-[0_4px_20px_rgba(0,0,0,0.08)]' : 'shadow-[0_2px_10px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_15px_rgba(0,0,0,0.06)]'} border border-slate-50 mb-4`}>
-                  <div className="text-3xl mb-1">{emoji}</div>
-                  <div className="text-[11px] font-medium text-slate-800 truncate max-w-[90px]">{playlist.name}</div>
-                  <div className="text-[9px] text-slate-400">Synced</div>
-                </div>
-                
-                <div className="text-[10px] text-slate-400">
-                  {playlist.tabs?.length || 0} tabs • {playlist.defaultInterval || 30}s interval
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      )}
-      
-      <div className="mt-8 mb-4">
-        <Button 
+
+                  {/* Title */}
+                  <h3 className="text-[clamp(0.8rem,0.95vw,1.2rem)] font-normal text-slate-800 mb-[0.5vw] mt-[0.5vw] text-center text-ellipsis overflow-hidden max-w-full">
+                    {playlist.name}
+                  </h3>
+
+                  {/* Duration */}
+                  <p
+                    className="text-[clamp(0.6rem,0.75vw,0.9rem)] text-gray-500 text-center"
+                    style={{ fontFamily: 'var(--font-geist-mono)' }}
+                  >
+                    {tabsCount} {tabsCount === 1 ? 'tab' : 'tabs'} · {totalDuration}
+                  </p>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Pinned Footer */}
+      <div className="w-full flex flex-col justify-center items-center gap-[1vw]">
+        <Button
           onClick={() => {
             const selected = playlists?.find((p) => p.id === selectedId)
             if (selected) {
@@ -138,8 +175,8 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
             }
             onNext()
           }}
-          disabled={!selectedId}
-          className="rounded-full bg-[#2a2a2a] hover:bg-black text-white px-10 h-10 font-medium disabled:opacity-50 cursor-pointer"
+          disabled={!selectedId || !playlists || playlists.length === 0}
+          className="rounded-xl bg-[#2a2a2a] hover:bg-black text-white px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] hover:shadow-lg hover:shadow-black/5 disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:scale-100 disabled:active:scale-100 disabled:pointer-events-auto disabled:cursor-not-allowed disabled:shadow-none disabled:opacity-100 animate-cta-enter"
         >
           Start playing
         </Button>
