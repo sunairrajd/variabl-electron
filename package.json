@@ -1,6 +1,6 @@
 {
   "name": "variabl-player",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "Variabl Player — Digital Signage App",
   "main": "./out/main/index.js",
   "scripts": {
