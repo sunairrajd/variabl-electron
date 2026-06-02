@@ -1,6 +1,6 @@
 {
   "name": "variabl-player",
-  "version": "0.9.8",
+  "version": "0.9.8.1",
   "description": "Variabl Player — Digital Signage App",
   "main": "./out/main/index.js",
   "scripts": {
@@ -75,7 +75,13 @@
     ],
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "resources/icon.icns"
     },
