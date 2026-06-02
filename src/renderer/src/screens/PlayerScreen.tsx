@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore, PlaylistTab, Playlist } from '@/stores/useAppStore'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Smartphone } from 'lucide-react'
 import PlayerOverlayScreen from './PlayerOverlayScreen'
 import { SyncService } from '@/services/SyncService'
 import RendererContainer from '@/components/renderers/RendererContainer'
@@ -18,6 +18,7 @@ export default function PlayerScreen() {
   const navigate = useAppStore((s) => s.navigate)
   const selectedPlaylist = useAppStore((s) => s.selectedPlaylist)
   const displayId = useAuthStore((s) => s.displayId)
+  const userId = useAuthStore((s) => s.firebaseUser?.uid)
   const webviewARef = useRef<any>(null)
 
   useEffect(() => {
@@ -37,36 +38,27 @@ export default function PlayerScreen() {
 
     updateNowPlaying(selectedPlaylist.id)
 
-    return () => {
-      // When playlist stops playing, clear nowPlayingPlaylistId
-      rtdbUpdate(rtdbRef(rtdb, `screens/${displayId}`), {
-        nowPlayingPlaylistId: "",
-        updatedAt: Date.now()
-      }).catch((err) => {
-        console.error('[PlayerScreen] Failed to clear nowPlayingPlaylistId in RTDB:', err)
-      })
-    }
+    // Removed the cleanup function here that was setting nowPlayingPlaylistId to "".
+    // Setting it to "" here causes race conditions with StrictMode or when switching playlists,
+    // immediately triggering the remote control listener to navigate to the inactive screen.
   }, [displayId, selectedPlaylist?.id])
 
   const pendingPlaylistUpdateRef = useRef<Playlist | null>(null)
 
   useEffect(() => {
-    if (!selectedPlaylist?.id || !displayId) return
-    
-    const playlistRef = rtdbRef(rtdb, `playlists/${selectedPlaylist.id}`)
-    const unsubscribe = onValue(playlistRef, async (snapshot) => {
-      const val = snapshot.val()
-      if (!val) return
+    if (!selectedPlaylist?.id || !userId) return
 
-      // Ignore updates we made ourselves
-      if (val.updatedBy === `screen_${displayId}`) return
+    const signalRef = rtdbRef(rtdb, `user_signals/${userId}/lastPlaylistUpdate`)
+    const unsubscribe = onValue(signalRef, async (snapshot) => {
+      const timestamp = snapshot.val()
+      if (!timestamp) return
 
-      console.log('[PlayerScreen] Playlist update signaled in RTDB, fetching latest...')
+      console.log(`[PlayerScreen] Signal received at ${timestamp}, fetching latest playlists...`)
       try {
         const baseUrl = 'https://tabrevolver.variabl.co'
         const deviceToken = useAuthStore.getState().deviceToken
         if (!deviceToken) return
-        
+
         const updatedPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, deviceToken)
         const freshPlaylist = updatedPlaylists.find((p: any) => p.id === selectedPlaylist.id)
         if (freshPlaylist) {
@@ -79,8 +71,8 @@ export default function PlayerScreen() {
     })
 
     return () => unsubscribe()
-  }, [selectedPlaylist?.id, displayId])
-  
+  }, [selectedPlaylist?.id, userId])
+
   const webviewBRef = useRef<any>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const preloadTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -102,50 +94,84 @@ export default function PlayerScreen() {
   const onFailCallbackRef = useRef<(() => void) | null>(null)
 
   const handleExit = () => {
+    document.exitFullscreen().catch(() => { })
+    window.electronAPI.invoke('toggle-kiosk', false).catch(() => { })
     window.electronAPI.invoke('stop-player')
     navigate('inactive')
+
+    if (displayId) {
+      rtdbUpdate(rtdbRef(rtdb, `screens/${displayId}`), {
+        nowPlayingPlaylistId: "",
+        updatedAt: Date.now()
+      }).catch((err) => {
+        console.error('[PlayerScreen] Failed to clear nowPlayingPlaylistId on exit:', err)
+      })
+    }
   }
 
   useEffect(() => {
-    if (selectedPlaylist?.tabs?.[0]) {
-      const initialTab = selectedPlaylist.tabs[0]
-      setTabA(initialTab)
-      setRenderKeyA(Date.now())
+    if (!selectedPlaylist) return
 
-      if (isWebsiteTab(initialTab)) {
-        const initialUrl = initialTab.url.startsWith('http')
-          ? initialTab.url
-          : `https://${initialTab.url}`
-        setUrlA(initialUrl)
-      }
-
-      // Preload the second tab if it exists
-      if (selectedPlaylist.tabs.length > 1) {
-        const secondTab = selectedPlaylist.tabs[1]
-        setTabB(secondTab)
-        setRenderKeyB(Date.now())
-        if (isWebsiteTab(secondTab)) {
-          const secondUrl = secondTab.url.startsWith('http')
-            ? secondTab.url
-            : `https://${secondTab.url}`
-          setUrlB(secondUrl)
-        }
-      }
-
-      setCountdown(10)
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer)
-            setFirstTabLoaded(true)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-      return () => clearInterval(timer)
+    if (!selectedPlaylist.tabs || selectedPlaylist.tabs.length === 0) {
+      setCountdown(0)
+      setFirstTabLoaded(true)
+      
+      // Enter fullscreen and kiosk mode even if empty
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`[PlayerScreen] Error attempting to enable fullscreen: ${err.message}`)
+      })
+      window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
+        console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
+      })
+      
+      return undefined
     }
-    return undefined
+
+    const initialTab = selectedPlaylist.tabs[0]
+    setTabA(initialTab)
+    setRenderKeyA(Date.now())
+
+    if (isWebsiteTab(initialTab)) {
+      const initialUrl = initialTab.url.startsWith('http')
+        ? initialTab.url
+        : `https://${initialTab.url}`
+      setUrlA(initialUrl)
+    }
+
+    // Preload the second tab if it exists
+    if (selectedPlaylist.tabs.length > 1) {
+      const secondTab = selectedPlaylist.tabs[1]
+      setTabB(secondTab)
+      setRenderKeyB(Date.now())
+      if (isWebsiteTab(secondTab)) {
+        const secondUrl = secondTab.url.startsWith('http')
+          ? secondTab.url
+          : `https://${secondTab.url}`
+        setUrlB(secondUrl)
+      }
+    }
+
+    setCountdown(10)
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          setFirstTabLoaded(true)
+
+          // Enter fullscreen and kiosk mode when player starts
+          document.documentElement.requestFullscreen().catch(err => {
+            console.error(`[PlayerScreen] Error attempting to enable fullscreen: ${err.message}`)
+          })
+          window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
+            console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
+          })
+
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
   }, [selectedPlaylist?.id])
   useEffect(() => {
     const cleanup = window.electronAPI.on('auth-window-state', (isOpen) => {
@@ -229,7 +255,7 @@ export default function PlayerScreen() {
   const triggerRotation = (nextIndex: number, force = false) => {
     const pendingUpdate = pendingPlaylistUpdateRef.current
     const actualPlaylist = (pendingUpdate && nextIndex === 0) ? pendingUpdate : selectedPlaylist
-    
+
     if (!actualPlaylist?.tabs) return
     if (isRotating && !force) return // Prevent overlapping rotations unless forced (manual skip)
 
@@ -508,12 +534,11 @@ export default function PlayerScreen() {
               if (el) el.setAttribute('allowpopups', '');
             }}
             src={urlA || undefined}
-            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${
-              activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
-            }`}
+            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+              }`}
           />
         )}
-        
+
         <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 && !isWebsiteTab(tabA) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
           {!isWebsiteTab(tabA) && (
             <RendererContainer
@@ -545,9 +570,8 @@ export default function PlayerScreen() {
               if (el) el.setAttribute('allowpopups', '');
             }}
             src={urlB || undefined}
-            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${
-              activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
-            }`}
+            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+              }`}
           />
         )}
 
@@ -586,10 +610,13 @@ export default function PlayerScreen() {
           speed={1}
           repeat={true}
         >
-          Your screen is getting ready
+          Activating display in <span className="text-lg font-mono">
+            00:{countdown.toString().padStart(2, '0')}
+          </span>
         </GradientWaveText>
-        <div className="text-xl font-mono text-white/90 mb-6">
-          00:{countdown.toString().padStart(2, '0')}
+        <div className="flex items-center gap-2 text-white/50 text-[clamp(0.8rem,1vw,1rem)] font-light mt-2">
+          <Smartphone className="w-[1.2em] h-[1.2em]" />
+          <span>To control this screen remotely, visit <span className="text-white/80 font-medium">variabl.co/app</span></span>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 {
   "name": "variabl-player",
-  "version": "1.0.0",
+  "version": "0.9.3",
   "description": "Variabl Player — Digital Signage App",
   "main": "./out/main/index.js",
   "scripts": {
@@ -24,6 +24,7 @@
     "camera-controls": "^3.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.3",
     "firebase": "^12.14.0",
     "lucide-react": "^1.16.0",
     "qrcode.react": "^4.2.0",
@@ -57,7 +58,14 @@
   },
   "build": {
     "appId": "com.variabl.player",
-    "productName": "VariablPlayer",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "sunairrajd",
+        "repo": "variabl-electron"
+      }
+    ],
+    "productName": "Variabl",
     "directories": {
       "output": "dist"
     },

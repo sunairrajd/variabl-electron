@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, session } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
+import { autoUpdater } from 'electron-updater'
 
 app.setName('Variabl')
 
@@ -148,7 +149,46 @@ app.whenReady().then(async () => {
     console.log('[Main] Consumed pending auth URL:', url)
     return url
   })
+  
+  // Autostart on machine login (Windows/macOS)
+  if (!is.dev) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      openAsHidden: false, // You can set this to true if you want it to start silently in the background
+    })
+  }
+
   createWindow()
+
+  // Setup auto-updater in production
+  if (!is.dev) {
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('[AutoUpdater] Update downloaded. Quitting and installing...', info.version)
+      // Small delay just to let any UI settle if needed, then force restart
+      setTimeout(() => {
+        autoUpdater.quitAndInstall(false, true) // silent = false (shows progress if Windows), forceRunAfter = true
+      }, 3000)
+    })
+
+    autoUpdater.on('error', (err) => {
+      console.error('[AutoUpdater] Error during update:', err)
+    })
+
+    // Check immediately on startup
+    autoUpdater.checkForUpdates().catch(err => {
+      console.error('[AutoUpdater] Initial update check failed:', err)
+    })
+
+    // Check again every 12 hours
+    setInterval(() => {
+      autoUpdater.checkForUpdates().catch(err => {
+        console.error('[AutoUpdater] Scheduled update check failed:', err)
+      })
+    }, 12 * 60 * 60 * 1000)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

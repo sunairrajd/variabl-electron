@@ -57,9 +57,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   logout: () => {
     setLocalStorageItem('deviceToken', null)
-    setLocalStorageItem('screenName', null)
-    setLocalStorageItem('displayId', null)
-    set({ deviceToken: null, firebaseUser: null, screenName: null, displayId: null })
+    set({ deviceToken: null, firebaseUser: null })
   }
 }))
 

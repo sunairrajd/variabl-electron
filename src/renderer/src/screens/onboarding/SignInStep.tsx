@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { db, doc, setDoc, rtdb, rtdbRef, rtdbSet } from '@/lib/firebase'
+import { db, doc, setDoc, rtdb, rtdbRef, rtdbSet, rtdbUpdate } from '@/lib/firebase'
+import { get } from 'firebase/database'
 import playlistsImage from '../../assets/playlists.png'
 
 interface SignInStepProps {
@@ -56,23 +57,40 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
               }
 
               const now = Date.now()
-              const screenData = {
-                createdAt: now,
-                displayId: displayId,
-                lastSeen: now,
-                nowPlayingPlaylistId: "",
-                screenName: screenName,
-                updatedAt: now,
-                userId: userId
+              const screenRefDb = rtdbRef(rtdb, `screens/${displayId}`)
+              const snapshot = await get(screenRefDb)
+
+              if (snapshot.exists()) {
+                await rtdbUpdate(screenRefDb, {
+                  userId: userId,
+                  lastSeen: now,
+                  updatedAt: now
+                })
+                await setDoc(doc(db, 'screens', displayId), {
+                  userId: userId,
+                  lastSeen: now,
+                  updatedAt: now
+                }, { merge: true })
+                console.log('[SignInStep] Successfully updated existing screen in Database')
+              } else {
+                const screenData = {
+                  createdAt: now,
+                  displayId: displayId,
+                  lastSeen: now,
+                  nowPlayingPlaylistId: "",
+                  screenName: screenName,
+                  updatedAt: now,
+                  userId: userId
+                }
+
+                // Write to Firebase Realtime Database
+                await rtdbSet(screenRefDb, screenData)
+
+                // Also write to Firestore just in case both are used
+                await setDoc(doc(db, 'screens', displayId), screenData, { merge: true })
+
+                console.log('[SignInStep] Successfully registered new screen in Database')
               }
-
-              // Write to Firebase Realtime Database
-              await rtdbSet(rtdbRef(rtdb, `screens/${displayId}`), screenData)
-
-              // Also write to Firestore just in case both are used
-              await setDoc(doc(db, 'screens', displayId), screenData, { merge: true })
-
-              console.log('[SignInStep] Successfully registered screen in Database')
             }
           } catch (err) {
             console.error('[SignInStep] Failed to save screen to Database:', err)
@@ -115,15 +133,15 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
   const handleGoogleSignIn = () => {
     if (isGoogleSigningIn) return;
     setIsGoogleSigningIn(true);
-    
+
     // Open variabl.co for the user login flow. 
     // The backend APIs will still be fetched from tabrevolver.variabl.co via IPC.
     const baseUrl = 'https://variabl.co'
     window.electronAPI.invoke('open-external', `${baseUrl}/login?desktop=true`)
-    
+
     setTimeout(() => {
       setIsGoogleSigningIn(false)
-    }, 5000)
+    }, 8000)
   }
 
   return (

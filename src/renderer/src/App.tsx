@@ -8,6 +8,7 @@ import OnboardingScreen from '@/screens/OnboardingScreen'
 import InactiveScreen from '@/screens/InactiveScreen'
 import PlayerOverlayScreen from '@/screens/PlayerOverlayScreen'
 import { rtdb, rtdbRef, rtdbUpdate } from '@/lib/firebase'
+import { onValue } from 'firebase/database'
 
 const SCREENS = {
   pairing: PairingScreen,
@@ -61,6 +62,67 @@ function App(): React.JSX.Element {
         // No persisted token (or store IPC not yet wired) — stay on pairing.
       })
   }, [navigate, setDeviceToken])
+
+  // Remote control: listen to nowPlayingPlaylistId from RTDB
+  useEffect(() => {
+    if (!displayId) return
+
+    const screenRef = rtdbRef(rtdb, `screens/${displayId}/nowPlayingPlaylistId`)
+    const unsubscribe = onValue(screenRef, (snapshot) => {
+      const playlistId = snapshot.val()
+
+      const state = useAppStore.getState()
+      const currentView = state.currentView
+      const currentSelectedPlaylist = state.selectedPlaylist
+
+      // Ignore remote control commands if we are in onboarding or pairing
+      if (currentView === 'pairing' || currentView === 'onboarding') return
+
+      if (!playlistId) {
+        state.navigate('inactive')
+        return
+      }
+
+      // If already playing this playlist, ignore
+      if (playlistId === currentSelectedPlaylist?.id && currentView === 'player') return
+
+      let attempts = 0
+      const maxAttempts = 12 // up to 1 minute (12 * 5s)
+
+      const tryFetch = async () => {
+        try {
+          const baseUrl = 'https://tabrevolver.variabl.co'
+          const deviceToken = useAuthStore.getState().deviceToken
+          if (!deviceToken) return
+
+          const updatedPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, deviceToken)
+          const targetPlaylist = updatedPlaylists.find((p: any) => p.id === playlistId)
+
+          if (targetPlaylist) {
+            console.log(`[RemoteControl] Found playlist ${playlistId}, starting playback.`)
+            state.setSelectedPlaylist(targetPlaylist)
+            state.navigate('player')
+            return
+          }
+        } catch (e) {
+          console.error("[RemoteControl] Error fetching playlists:", e)
+        }
+
+        attempts++
+        if (attempts < maxAttempts) {
+          console.log(`[RemoteControl] Playlist ${playlistId} not found, retrying... (${attempts}/${maxAttempts})`)
+          setTimeout(tryFetch, 8000)
+        } else {
+          console.warn(`[RemoteControl] Could not find playlist ${playlistId} after 1 minute.`)
+        }
+      }
+
+      tryFetch()
+    })
+
+    return () => unsubscribe()
+  }, [displayId])
+
 
 
 
