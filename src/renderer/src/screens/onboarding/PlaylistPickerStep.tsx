@@ -15,6 +15,7 @@ const getEmoji = (index: number) => EMOJIS[index % EMOJIS.length]
 
 export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerStepProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [updateReady, setUpdateReady] = useState(false)
   const deviceToken = useAuthStore((s) => s.deviceToken)
   const setSelectedPlaylist = useAppStore((s) => s.setSelectedPlaylist)
   const baseUrl = 'https://tabrevolver.variabl.co'
@@ -50,8 +51,24 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
     }
   }, [playlists, selectedId])
 
+  useEffect(() => {
+    const cleanup = window.electronAPI.on('update-downloaded', () => {
+      setUpdateReady(true)
+    })
+    return cleanup
+  }, [])
+
   return (
-    <div className="flex flex-col justify-between items-center w-full h-full p-[3vw] opacity-0 animate-screen-enter">
+    <div className="flex flex-col justify-between items-center w-full h-full p-[3vw] opacity-0 animate-screen-enter relative">
+      {updateReady && (
+        <Button
+          onClick={() => window.electronAPI.invoke('install-update')}
+          className="absolute top-[2vw] right-[3vw] rounded-full bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
+        >
+          Restart to Update
+        </Button>
+      )}
+
       {/* Pinned Header Spacer & Title Area */}
       <div className="w-full flex flex-col items-center">
         <div className="w-full flex items-center justify-between">

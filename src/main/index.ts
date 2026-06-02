@@ -149,6 +149,14 @@ app.whenReady().then(async () => {
     console.log('[Main] Consumed pending auth URL:', url)
     return url
   })
+
+  // Expose manual install-update
+  import('electron').then(({ ipcMain }) => {
+    ipcMain.handle('install-update', () => {
+      console.log('[Main] Manual install-update triggered from renderer')
+      autoUpdater.quitAndInstall(false, true)
+    })
+  })
   
   // Autostart on machine login (Windows/macOS)
   if (!is.dev) {
@@ -167,10 +175,19 @@ app.whenReady().then(async () => {
 
     autoUpdater.on('update-downloaded', (info) => {
       console.log('[AutoUpdater] Update downloaded. Quitting and installing...', info.version)
-      // Small delay just to let any UI settle if needed, then force restart
+      
+      // Notify all open windows that an update is ready
+      BrowserWindow.getAllWindows().forEach(win => {
+        if (!win.isDestroyed()) {
+          win.webContents.send('update-downloaded', info.version)
+        }
+      })
+
+      // Give users 10 minutes to manually restart if they are interacting, 
+      // otherwise force restart to ensure kiosk stays updated.
       setTimeout(() => {
-        autoUpdater.quitAndInstall(false, true) // silent = false (shows progress if Windows), forceRunAfter = true
-      }, 3000)
+        autoUpdater.quitAndInstall(false, true)
+      }, 10 * 60 * 1000)
     })
 
     autoUpdater.on('error', (err) => {
