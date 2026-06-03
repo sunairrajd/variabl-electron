@@ -51,6 +51,11 @@ let pendingAuthUrl: string | null = null
 
 app.setAsDefaultProtocolClient('tabrevolver')
 
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+  process.exit(0)
+}
+
 // Handle deep links (macOS)
 app.on('open-url', (event, url) => {
   event.preventDefault()

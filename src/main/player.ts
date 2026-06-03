@@ -5,8 +5,8 @@ export function stopPlayer() {
 
   const mainWindow = BrowserWindow.getAllWindows()[0]
   if (mainWindow) {
-    if (mainWindow.isKiosk()) {
-      mainWindow.setKiosk(false)
+    if (mainWindow.isFullScreen()) {
+      mainWindow.setFullScreen(false)
     }
   }
 }

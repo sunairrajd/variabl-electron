@@ -32,7 +32,7 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
     import('electron').then(({ BrowserWindow }) => {
       const mainWindow = BrowserWindow.getAllWindows()[0]
       if (mainWindow) {
-        mainWindow.setKiosk(enabled)
+        mainWindow.setFullScreen(enabled)
       }
     })
   })

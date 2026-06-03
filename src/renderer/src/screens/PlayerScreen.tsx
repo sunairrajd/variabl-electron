@@ -94,7 +94,7 @@ export default function PlayerScreen() {
   const onFailCallbackRef = useRef<(() => void) | null>(null)
 
   const handleExit = () => {
-    document.exitFullscreen().catch(() => { })
+    // Exit kiosk mode
     window.electronAPI.invoke('toggle-kiosk', false).catch(() => { })
     window.electronAPI.invoke('stop-player')
     navigate('inactive')
@@ -116,10 +116,7 @@ export default function PlayerScreen() {
       setCountdown(0)
       setFirstTabLoaded(true)
       
-      // Enter fullscreen and kiosk mode even if empty
-      document.documentElement.requestFullscreen().catch(err => {
-        console.error(`[PlayerScreen] Error attempting to enable fullscreen: ${err.message}`)
-      })
+      // Enter kiosk mode even if empty
       window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
         console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
       })
@@ -158,10 +155,7 @@ export default function PlayerScreen() {
           clearInterval(timer)
           setFirstTabLoaded(true)
 
-          // Enter fullscreen and kiosk mode when player starts
-          document.documentElement.requestFullscreen().catch(err => {
-            console.error(`[PlayerScreen] Error attempting to enable fullscreen: ${err.message}`)
-          })
+          // Enter kiosk mode when player starts
           window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
             console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
           })
@@ -529,13 +523,10 @@ export default function PlayerScreen() {
       <div className="absolute inset-0 h-full w-full">
         {isWebsiteTab(tabA) && (
           <webview
-            ref={(el) => {
-              webviewARef.current = el;
-              if (el) el.setAttribute('allowpopups', '');
-            }}
+            ref={(el) => { webviewARef.current = el }}
+            allowpopups={"true" as any}
             src={urlA || undefined}
-            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
-              }`}
+            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
           />
         )}
 
@@ -565,13 +556,10 @@ export default function PlayerScreen() {
 
         {isWebsiteTab(tabB) && (
           <webview
-            ref={(el) => {
-              webviewBRef.current = el;
-              if (el) el.setAttribute('allowpopups', '');
-            }}
+            ref={(el) => { webviewBRef.current = el }}
+            allowpopups={"true" as any}
             src={urlB || undefined}
-            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
-              }`}
+            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
           />
         )}
 
