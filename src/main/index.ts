@@ -89,6 +89,16 @@ app.whenReady().then(async () => {
     callback({ cancel: false, responseHeaders })
   })
 
+  // Spoof Referer/Origin for YouTube embeds (fixes Error 153 in production file:// builds)
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.youtube.com/*', '*://*.googlevideo.com/*', '*://*.youtube-nocookie.com/*'] },
+    (details, callback) => {
+      details.requestHeaders['Referer'] = 'https://variabl.co'
+      details.requestHeaders['Origin'] = 'https://variabl.co'
+      callback({ requestHeaders: details.requestHeaders })
+    }
+  )
+
   // Spoof User Agent to disguise Electron environment
   const currentUserAgent = session.defaultSession.getUserAgent()
   const cleanUserAgent = currentUserAgent
