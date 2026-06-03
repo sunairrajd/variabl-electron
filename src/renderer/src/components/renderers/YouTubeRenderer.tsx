@@ -80,7 +80,8 @@ export default function YouTubeRenderer({ tab, isActive, isPaused, onFinish, onR
         modestbranding: 1,
         fs: 0,
         iv_load_policy: 3,
-        mute: tab.mute ? 1 : 0
+        mute: tab.mute ? 1 : 0,
+        origin: 'https://variabl.co'
       },
       events: {
         onReady: (event: any) => {

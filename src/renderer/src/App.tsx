@@ -48,20 +48,12 @@ function App(): React.JSX.Element {
   }, [displayId])
 
   // Auto-login: a stored deviceToken means the device was already paired.
-  // Full custom-token re-auth lands in Task 6; here we only restore routing.
   useEffect(() => {
-    window.electronAPI
-      .invoke('store-get', 'deviceToken')
-      .then((token) => {
-        if (typeof token === 'string' && token.length > 0) {
-          setDeviceToken(token)
-          navigate('picker')
-        }
-      })
-      .catch(() => {
-        // No persisted token (or store IPC not yet wired) — stay on pairing.
-      })
-  }, [navigate, setDeviceToken])
+    const token = useAuthStore.getState().deviceToken
+    if (token && token.length > 0) {
+      navigate('picker')
+    }
+  }, [navigate])
 
   // Remote control: listen to nowPlayingPlaylistId from RTDB
   useEffect(() => {

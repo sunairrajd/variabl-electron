@@ -23,10 +23,11 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
         let tokenToUse = ''
         // Handle full deep link tabrevolver://auth?token=... OR just a raw token string
         if (url.startsWith('tabrevolver://') || url.includes('token=')) {
-          const parsedUrl = new URL(url.replace('tabrevolver://', 'https://'))
+          const cleanUrl = typeof url === 'string' ? url.replace(/\/$/, '') : url
+          const parsedUrl = new URL(cleanUrl.replace('tabrevolver://', 'https://'))
           const token = parsedUrl.searchParams.get('token')
           if (token) {
-            tokenToUse = token
+            tokenToUse = token.replace(/\/$/, '')
           }
         } else if (url.trim().length > 20) {
           tokenToUse = url.trim()
