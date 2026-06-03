@@ -77,7 +77,7 @@ app.whenReady().then(async () => {
   // Global anti-embedding bypass for strict websites (Google, Amazon, etc.)
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = { ...details.responseHeaders }
-    
+
     // Strip headers that prevent embedding
     for (const key of Object.keys(responseHeaders)) {
       const lowerKey = key.toLowerCase()
@@ -85,7 +85,7 @@ app.whenReady().then(async () => {
         delete responseHeaders[key]
       }
     }
-    
+
     callback({ cancel: false, responseHeaders })
   })
 
@@ -110,7 +110,7 @@ app.whenReady().then(async () => {
     contents.setWindowOpenHandler(({ url }) => {
       console.log('[Main] webview requested popup for URL:', url)
       const mainWindow = BrowserWindow.getAllWindows()[0]
-      
+
       const authWindow = new BrowserWindow({
         width: 500,
         height: 700,
@@ -162,7 +162,7 @@ app.whenReady().then(async () => {
       autoUpdater.quitAndInstall(false, true)
     })
   })
-  
+
   // Autostart on machine login (Windows/macOS)
   if (!is.dev) {
     app.setLoginItemSettings({
@@ -180,7 +180,7 @@ app.whenReady().then(async () => {
 
     autoUpdater.on('update-downloaded', (info) => {
       console.log('[AutoUpdater] Update downloaded. Quitting and installing...', info.version)
-      
+
       // Notify all open windows that an update is ready
       BrowserWindow.getAllWindows().forEach(win => {
         if (!win.isDestroyed()) {
@@ -192,7 +192,7 @@ app.whenReady().then(async () => {
       // otherwise force restart to ensure kiosk stays updated.
       setTimeout(() => {
         autoUpdater.quitAndInstall(false, true)
-      }, 10 * 60 * 1000)
+      }, 1 * 60 * 1000)
     })
 
     autoUpdater.on('error', (err) => {
@@ -204,12 +204,12 @@ app.whenReady().then(async () => {
       console.error('[AutoUpdater] Initial update check failed:', err)
     })
 
-    // Check again every 12 hours
+    // Check again every 15 minutes
     setInterval(() => {
       autoUpdater.checkForUpdates().catch(err => {
         console.error('[AutoUpdater] Scheduled update check failed:', err)
       })
-    }, 12 * 60 * 60 * 1000)
+    }, 15 * 60 * 1000)
   }
 
   app.on('activate', () => {
@@ -223,7 +223,7 @@ app.on('second-instance', (event, commandLine) => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.focus()
-    
+
     // The url is usually the last argument
     const url = commandLine.pop()
     if (url) {
