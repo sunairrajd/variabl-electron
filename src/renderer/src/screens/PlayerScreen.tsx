@@ -65,8 +65,12 @@ export default function PlayerScreen() {
           console.log('[PlayerScreen] Playlist fetched, staging for next loop...')
           pendingPlaylistUpdateRef.current = freshPlaylist
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('[PlayerScreen] Failed to fetch updated playlist:', err)
+        if (err.message?.includes('401')) {
+          useAuthStore.getState().logout()
+          navigate('onboarding')
+        }
       }
     })
 
@@ -598,9 +602,15 @@ export default function PlayerScreen() {
           speed={1}
           repeat={true}
         >
-          Activating display in <span className="text-lg font-mono">
-            00:{countdown.toString().padStart(2, '0')}
-          </span>
+          {selectedPlaylist ? (
+            <>
+              Activating display in <span className="text-lg font-mono">
+                00:{countdown.toString().padStart(2, '0')}
+              </span>
+            </>
+          ) : (
+            'Waiting for playlist...'
+          )}
         </GradientWaveText>
         <div className="flex items-center gap-2 text-white/50 text-[clamp(0.8rem,1vw,1rem)] font-light mt-2">
           <Smartphone className="w-[1.2em] h-[1.2em]" />

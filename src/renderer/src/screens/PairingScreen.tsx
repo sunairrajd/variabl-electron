@@ -29,7 +29,7 @@ function PairingScreen(): React.JSX.Element {
   function handleSubmit(event: React.FormEvent): void {
     event.preventDefault()
     if (!isPinComplete) return
-    navigate('picker')
+    navigate('player')
   }
 
   return (

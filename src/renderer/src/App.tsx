@@ -1,8 +1,6 @@
 import { useEffect } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import PairingScreen from '@/screens/PairingScreen'
-import PlaylistPicker from '@/screens/PlaylistPicker'
 import PlayerScreen from '@/screens/PlayerScreen'
 import OnboardingScreen from '@/screens/OnboardingScreen'
 import InactiveScreen from '@/screens/InactiveScreen'
@@ -11,8 +9,6 @@ import { rtdb, rtdbRef, rtdbUpdate } from '@/lib/firebase'
 import { onValue } from 'firebase/database'
 
 const SCREENS = {
-  pairing: PairingScreen,
-  picker: PlaylistPicker,
   player: PlayerScreen,
   onboarding: OnboardingScreen,
   inactive: InactiveScreen,
@@ -51,7 +47,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     const token = useAuthStore.getState().deviceToken
     if (token && token.length > 0) {
-      navigate('picker')
+      navigate('player')
     }
   }, [navigate])
 
@@ -67,8 +63,8 @@ function App(): React.JSX.Element {
       const currentView = state.currentView
       const currentSelectedPlaylist = state.selectedPlaylist
 
-      // Ignore remote control commands if we are in onboarding or pairing
-      if (currentView === 'pairing' || currentView === 'onboarding') return
+      // Ignore remote control commands if we are in onboarding
+      if (currentView === 'onboarding') return
 
       if (!playlistId) {
         state.navigate('inactive')
@@ -96,8 +92,13 @@ function App(): React.JSX.Element {
             state.navigate('player')
             return
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error("[RemoteControl] Error fetching playlists:", e)
+          if (e.message?.includes('401')) {
+            useAuthStore.getState().logout()
+            state.navigate('onboarding')
+            return
+          }
         }
 
         attempts++

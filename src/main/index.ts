@@ -1,5 +1,5 @@
 import { app, BrowserWindow, shell, session } from 'electron'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 import { autoUpdater } from 'electron-updater'
@@ -49,7 +49,11 @@ function createWindow(): void {
 
 let pendingAuthUrl: string | null = null
 
-app.setAsDefaultProtocolClient('tabrevolver')
+if (process.defaultApp && process.argv.length >= 2) {
+  app.setAsDefaultProtocolClient('tabrevolver', process.execPath, [resolve(process.argv[1])])
+} else {
+  app.setAsDefaultProtocolClient('tabrevolver')
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()

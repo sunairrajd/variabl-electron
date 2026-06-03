@@ -11,7 +11,9 @@ import { AuroraBackground } from '@/components/ui/aurora-background'
 export type OnboardingStep = 'splash' | 'intro' | 'signin' | 'picker'
 
 export default function OnboardingScreen() {
-  const [step, setStep] = useState<OnboardingStep>('splash')
+  const [step, setStep] = useState<OnboardingStep>(() => {
+    return localStorage.getItem('hasSeenIntro') === 'true' ? 'signin' : 'splash'
+  })
   const navigate = useAppStore((s) => s.navigate)
 
   const showBackButton = step !== 'splash'
@@ -33,7 +35,10 @@ export default function OnboardingScreen() {
       )}
 
       {step === 'splash' && <SplashStep onNext={() => setStep('intro')} />}
-      {step === 'intro' && <IntroStep onNext={() => setStep('signin')} onBack={handleBack} />}
+      {step === 'intro' && <IntroStep onNext={() => {
+        localStorage.setItem('hasSeenIntro', 'true')
+        setStep('signin')
+      }} onBack={handleBack} />}
       {step === 'signin' && (
         <SignInStep onNext={() => setStep('picker')} onBack={handleBack} />
       )}
