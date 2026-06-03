@@ -9,6 +9,7 @@ interface SplashStepProps {
 
 export default function SplashStep({ onNext }: SplashStepProps) {
   const [mounted, setMounted] = useState(false)
+  const [version, setVersion] = useState<string | null>(null)
 
   useEffect(() => {
     // Give the WebGL shaders a moment to compile before fading in
@@ -24,6 +25,12 @@ export default function SplashStep({ onNext }: SplashStepProps) {
       clearTimeout(timer)
     }
   }, [onNext])
+
+  useEffect(() => {
+    window.electronAPI.invoke('get-app-version').then((v: string) => {
+      setVersion(v)
+    }).catch(console.error)
+  }, [])
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black">
@@ -77,9 +84,16 @@ export default function SplashStep({ onNext }: SplashStepProps) {
 
       <div className="relative z-10 flex items-center gap-[6vw]">
         <img src={variablLogo} alt="Variabl" className="h-[clamp(1.25rem,1.8vw,4.5rem)] w-auto object-contain opacity-0 animate-reveal [animation-delay:800ms]" />
-        {/* <div className="h-[clamp(1.25rem,2vw,4.5rem)] w-px bg-slate-300" /> */}
         <img src={tabRevolverLogo} alt="Tab Revolver" className="h-[clamp(1.25rem,1.8vw,4.5rem)] w-auto object-contain opacity-0 animate-reveal [animation-delay:800ms]" />
       </div>
+      
+      {version && (
+        <div className="absolute bottom-[3vw] left-0 right-0 flex justify-center z-10">
+          <div className="opacity-0 animate-reveal [animation-delay:1000ms] text-slate-400 font-mono text-[clamp(0.6rem,0.8vw,1rem)] tracking-widest uppercase">
+            v{version}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
