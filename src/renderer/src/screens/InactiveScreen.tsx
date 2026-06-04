@@ -46,6 +46,7 @@ export default function InactiveScreen() {
             className="rounded-xl bg-transparent border-0 text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] animate-cta-enter"
           >
             Manage this screen on Variabl.co
+
           </Button>
         </div>
       </div>
