@@ -29,16 +29,35 @@ export default function PlaylistPickerStep({ onNext, onBack }: PlaylistPickerSte
         return res
       } catch (err: any) {
         console.error('IPC fetch failed, attempting direct fetch fallback:', err)
-        // Fallback to direct fetch in case of developer process restarts not having registered IPC yet
-        const response = await fetch(`${baseUrl}/api/playlists`, {
-          headers: {
-            'Authorization': `Bearer ${deviceToken}`
-          }
-        })
-        if (!response.ok) {
-          throw new Error('Failed to fetch playlists')
+        
+        if (err.message && err.message.includes('401')) {
+          useAuthStore.getState().logout()
+          onBack()
+          throw new Error('Session expired. Please sign in again.')
         }
-        return response.json()
+
+        try {
+          // Fallback to direct fetch in case of developer process restarts not having registered IPC yet
+          const response = await fetch(`${baseUrl}/api/playlists`, {
+            headers: {
+              'Authorization': `Bearer ${deviceToken}`
+            }
+          })
+          if (!response.ok) {
+            if (response.status === 401) {
+              useAuthStore.getState().logout()
+              onBack()
+              throw new Error('Session expired. Please sign in again.')
+            }
+            throw new Error(`Failed to fetch playlists: ${response.status}`)
+          }
+          return response.json()
+        } catch (fetchErr: any) {
+          if (fetchErr.message === 'Session expired. Please sign in again.') {
+            throw fetchErr
+          }
+          throw err // throw the original IPC error if fetch fallback also fails (e.g. CORS)
+        }
       }
     },
     enabled: !!deviceToken

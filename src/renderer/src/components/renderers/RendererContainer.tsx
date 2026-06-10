@@ -16,7 +16,7 @@ interface RendererProps {
 export default function RendererContainer({ tab, isActive, isPaused, onFinish, onReady, onFail }: RendererProps) {
   if (!tab) return null
 
-  const isYouTube = tab.type === 'youtube' || tab.faviconURL?.includes('youtube.com')
+  const isYouTube = tab.type === 'youtube' || tab.faviconURL?.includes('youtube.com') || tab.url?.includes('youtube.com') || tab.url?.includes('youtu.be')
   const isImage = tab.type === 'image'
   const isMessage = tab.type === 'message' || tab.type === 'announcement'
   const isGSheet = tab.type === 'gsheet'

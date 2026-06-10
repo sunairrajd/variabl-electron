@@ -43,28 +43,16 @@ function App(): React.JSX.Element {
     return () => clearInterval(interval)
   }, [displayId])
 
-  // Auto-login: a stored deviceToken means the device was already paired.
-  useEffect(() => {
-    const token = useAuthStore.getState().deviceToken
-    if (token && token.length > 0) {
-      navigate('player')
-    }
-  }, [navigate])
-
   // Remote control: listen to nowPlayingPlaylistId from RTDB
   useEffect(() => {
-    if (!displayId) return
+    if (!displayId || currentView === 'onboarding') return
 
     const screenRef = rtdbRef(rtdb, `screens/${displayId}/nowPlayingPlaylistId`)
     const unsubscribe = onValue(screenRef, (snapshot) => {
       const playlistId = snapshot.val()
 
       const state = useAppStore.getState()
-      const currentView = state.currentView
       const currentSelectedPlaylist = state.selectedPlaylist
-
-      // Ignore remote control commands if we are in onboarding
-      if (currentView === 'onboarding') return
 
       if (!playlistId) {
         state.navigate('inactive')
@@ -114,7 +102,7 @@ function App(): React.JSX.Element {
     })
 
     return () => unsubscribe()
-  }, [displayId])
+  }, [displayId, currentView])
 
 
 

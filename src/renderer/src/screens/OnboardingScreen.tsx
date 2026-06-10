@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import SplashStep from '@/screens/onboarding/SplashStep'
 import IntroStep from '@/screens/onboarding/IntroStep'
 import SignInStep from '@/screens/onboarding/SignInStep'
 import PlaylistPickerStep from '@/screens/onboarding/PlaylistPickerStep'
 import { useAppStore } from '@/stores/useAppStore'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { rtdb, rtdbRef } from '@/lib/firebase'
+import { get } from 'firebase/database'
 import { ArrowLeft } from 'lucide-react'
 
 import { AuroraBackground } from '@/components/ui/aurora-background'
@@ -12,9 +15,71 @@ export type OnboardingStep = 'splash' | 'intro' | 'signin' | 'picker'
 
 export default function OnboardingScreen() {
   const [step, setStep] = useState<OnboardingStep>(() => {
-    return localStorage.getItem('hasSeenIntro') === 'true' ? 'signin' : 'splash'
+    return sessionStorage.getItem('hasSeenSplash') === 'true'
+      ? (localStorage.getItem('hasSeenIntro') === 'true' ? 'signin' : 'intro')
+      : 'splash'
   })
   const navigate = useAppStore((s) => s.navigate)
+
+  const [postSplashAction, setPostSplashAction] = useState<(() => void) | null>(null)
+
+  useEffect(() => {
+    if (step !== 'splash') return
+
+    const determineNextStep = async () => {
+      const token = useAuthStore.getState().deviceToken
+      const displayId = useAuthStore.getState().displayId
+
+      if (!token) {
+        setPostSplashAction(() => () => {
+          sessionStorage.setItem('hasSeenSplash', 'true')
+          setStep(localStorage.getItem('hasSeenIntro') === 'true' ? 'signin' : 'intro')
+        })
+        return
+      }
+
+      if (token && !displayId) {
+        setPostSplashAction(() => () => {
+          sessionStorage.setItem('hasSeenSplash', 'true')
+          setStep('picker')
+        })
+        return
+      }
+
+      try {
+        const snapshot = await get(rtdbRef(rtdb, `screens/${displayId}/nowPlayingPlaylistId`))
+        const playlistId = snapshot.val()
+        if (playlistId) {
+          setPostSplashAction(() => () => {
+            sessionStorage.setItem('hasSeenSplash', 'true')
+            navigate('player')
+          })
+        } else {
+          setPostSplashAction(() => () => {
+            sessionStorage.setItem('hasSeenSplash', 'true')
+            setStep('picker')
+          })
+        }
+      } catch (err) {
+        console.error('[Onboarding] Error checking RTDB:', err)
+        setPostSplashAction(() => () => {
+          sessionStorage.setItem('hasSeenSplash', 'true')
+          setStep('picker')
+        })
+      }
+    }
+
+    determineNextStep()
+  }, [step, navigate])
+
+  const handleSplashComplete = () => {
+    if (postSplashAction) {
+      postSplashAction()
+    } else {
+      sessionStorage.setItem('hasSeenSplash', 'true')
+      setStep(localStorage.getItem('hasSeenIntro') === 'true' ? 'signin' : 'intro')
+    }
+  }
 
   const showBackButton = step !== 'splash'
   const handleBack = () => {
@@ -34,7 +99,7 @@ export default function OnboardingScreen() {
         </button>
       )}
 
-      {step === 'splash' && <SplashStep onNext={() => setStep('intro')} />}
+      {step === 'splash' && <SplashStep onNext={handleSplashComplete} />}
       {step === 'intro' && <IntroStep onNext={() => {
         localStorage.setItem('hasSeenIntro', 'true')
         setStep('signin')
@@ -45,7 +110,7 @@ export default function OnboardingScreen() {
       {step === 'picker' && (
         <PlaylistPickerStep
           onNext={() => {
-            navigate('player') // End of onboarding, go to player screen
+            navigate('player')
           }}
           onBack={handleBack}
         />

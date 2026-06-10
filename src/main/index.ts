@@ -4,6 +4,10 @@ import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 import { autoUpdater } from 'electron-updater'
 
+// Allow autoplay without user gesture — required for digital signage / kiosk mode.
+// Must be set before app.whenReady().
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+
 app.setName('Variabl')
 
 export function loadDashboard() {
@@ -37,6 +41,9 @@ function createWindow(): void {
 
   win.on('ready-to-show', () => {
     win.show()
+    if (is.dev) {
+      win.webContents.openDevTools({ mode: 'detach' })
+    }
   })
 
   win.webContents.setWindowOpenHandler((details) => {
@@ -97,8 +104,12 @@ app.whenReady().then(async () => {
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['*://*.youtube.com/*', '*://*.googlevideo.com/*', '*://*.youtube-nocookie.com/*'] },
     (details, callback) => {
-      details.requestHeaders['Referer'] = 'https://variabl.co'
-      details.requestHeaders['Origin'] = 'https://variabl.co'
+      // Only spoof the top-level iframe/document requests. 
+      // Spoofing internal XHR/fetch/ping requests breaks YouTube's internal CSRF/CORS.
+      if (details.resourceType === 'subFrame' || details.resourceType === 'mainFrame') {
+        details.requestHeaders['Referer'] = 'https://variabl.co/'
+        details.requestHeaders['Origin'] = 'https://variabl.co'
+      }
       callback({ requestHeaders: details.requestHeaders })
     }
   )
@@ -124,39 +135,57 @@ app.whenReady().then(async () => {
     contents.setWindowOpenHandler(({ url }) => {
       console.log('[Main] webview requested popup for URL:', url)
       const mainWindow = BrowserWindow.getAllWindows()[0]
-
-      const authWindow = new BrowserWindow({
-        width: 500,
-        height: 700,
-        parent: mainWindow,
-        alwaysOnTop: true,
-        focusable: true,
-        autoHideMenuBar: true,
-        webPreferences: {
-          session: contents.session // Use the SAME session partition as the webview
-        }
-      })
-
-      authWindow.loadURL(url)
-
-      if (mainWindow) {
-        mainWindow.webContents.send('auth-window-state', true)
+      
+      let wasFullScreen = false
+      if (mainWindow && mainWindow.isFullScreen()) {
+        wasFullScreen = true
       }
 
-      authWindow.on('closed', () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('auth-window-state', false)
-        }
-      })
+      const createAuthWindow = () => {
+        const authWindow = new BrowserWindow({
+          width: 800,
+          height: 650,
+          alwaysOnTop: true,
+          focusable: true,
+          autoHideMenuBar: true,
+          webPreferences: {
+            session: contents.session // Use the SAME session partition as the webview
+          }
+        })
 
-      authWindow.webContents.on('did-navigate', (_, navUrl) => {
-        console.log('[Main] authWindow did-navigate to:', navUrl)
-        if (navUrl.includes('mail.google.com') && !navUrl.includes('accounts.google.com')) {
-          console.log('[Main] Closing auth window due to did-navigate matching mail.google.com')
-          authWindow.close()
-          contents.reload()
+        authWindow.loadURL(url)
+
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('auth-window-state', true)
         }
-      })
+
+        authWindow.on('closed', () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('auth-window-state', false)
+            if (wasFullScreen) {
+              mainWindow.setFullScreen(true)
+            }
+          }
+        })
+
+        authWindow.webContents.on('did-navigate', (_, navUrl) => {
+          console.log('[Main] authWindow did-navigate to:', navUrl)
+          if (navUrl.includes('mail.google.com') && !navUrl.includes('accounts.google.com')) {
+            console.log('[Main] Closing auth window due to did-navigate matching mail.google.com')
+            authWindow.close()
+            contents.reload()
+          }
+        })
+      }
+
+      if (wasFullScreen && mainWindow) {
+        mainWindow.once('leave-full-screen', () => {
+          createAuthWindow()
+        })
+        mainWindow.setFullScreen(false)
+      } else {
+        createAuthWindow()
+      }
 
       return { action: 'deny' }
     })

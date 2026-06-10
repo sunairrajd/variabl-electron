@@ -11,7 +11,11 @@ import { GradientWaveText } from '@/components/ui/gradient-wave-text'
 
 const isWebsiteTab = (tab: PlaylistTab | null) => {
   if (!tab) return true;
-  return !['youtube', 'image', 'message', 'announcement', 'gsheet'].includes(tab.type) && !tab.faviconURL?.includes('youtube.com');
+  const isYoutube = tab.type === 'youtube' || 
+                    tab.faviconURL?.includes('youtube.com') || 
+                    tab.url?.includes('youtube.com') || 
+                    tab.url?.includes('youtu.be');
+  return !['youtube', 'image', 'message', 'announcement', 'gsheet'].includes(tab.type) && !isYoutube;
 }
 
 export default function PlayerScreen() {
@@ -446,7 +450,10 @@ export default function PlayerScreen() {
         ? (selectedPlaylist.defaultInterval || 30) * 1000
         : (currentTab.interval || selectedPlaylist.defaultInterval || 30) * 1000)
 
-    const preloadMs = Math.max(0, intervalMs - 5000)
+    // Ensure we wait at least 1500ms before preloading the next tab.
+    // The previous view takes 1000ms to fade out. If we preload immediately (e.g., interval is small),
+    // we would change the src of the fading-out webview, causing a visible flash of the next tab.
+    const preloadMs = Math.max(1500, intervalMs - 5000)
 
     if (timerRef.current) clearTimeout(timerRef.current)
     if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
@@ -621,7 +628,7 @@ export default function PlayerScreen() {
       {firstTabLoaded && (
         <PlayerOverlayScreen
           playlistName={selectedPlaylist?.name || 'My Playlist'}
-          tabCount={selectedPlaylist?.tabs?.length || 0}
+          tabs={selectedPlaylist?.tabs || []}
           currentIndex={currentIndex}
           currentTabName={selectedPlaylist?.tabs?.[currentIndex]?.title || selectedPlaylist?.tabs?.[currentIndex]?.url || ''}
           isPaused={isPaused}
