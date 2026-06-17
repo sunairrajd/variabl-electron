@@ -20,6 +20,7 @@ export interface SystemMemory {
 export interface IpcInvokeContract {
   'get-monitors': { args: []; result: MonitorInfo[] }
   'get-app-version': { args: []; result: string }
+  'get-system-info': { args: []; result: { computerName: string; os: string } }
   'get-system-memory': { args: []; result: SystemMemory }
   'set-display': { args: [displayId: number]; result: void }
   'show-website': { args: [url: string]; result: void }
@@ -30,7 +31,9 @@ export interface IpcInvokeContract {
   'toggle-kiosk': { args: [enabled: boolean]; result: void }
   'open-external': { args: [url: string]; result: void }
   'fetch-playlists': { args: [baseUrl: string, token: string]; result: any }
+  'fetch-custom-token': { args: [baseUrl: string, token: string]; result: { customToken: string } }
   'sync-playlist': { args: [baseUrl: string, token: string, playlistId: string, tabs: any[]]; result: any }
+  'sync-device-screens': { args: [baseUrl: string, token: string, devicePayload: any, screensData: any[]]; result: any }
   'get-pending-auth-url': { args: []; result: string | null }
   'start-player': { args: [playlist: any]; result: void }
   'stop-player': { args: []; result: void }
@@ -38,6 +41,9 @@ export interface IpcInvokeContract {
   'player-resume': { args: []; result: void }
   'player-inactive': { args: []; result: void }
   'install-update': { args: []; result: void }
+  'start-secondary-players': { args: [assignments: Record<number, any>]; result: void }
+  'close-secondary-players': { args: []; result: void }
+  'player-ready': { args: [monitorId: number]; result: void }
 }
 
 export type InvokeChannel = keyof IpcInvokeContract
@@ -48,6 +54,7 @@ export type InvokeResult<C extends InvokeChannel> = IpcInvokeContract[C]['result
 export const INVOKE_CHANNELS = [
   'get-monitors',
   'get-app-version',
+  'get-system-info',
   'get-system-memory',
   'set-display',
   'show-website',
@@ -58,21 +65,26 @@ export const INVOKE_CHANNELS = [
   'toggle-kiosk',
   'open-external',
   'fetch-playlists',
+  'fetch-custom-token',
   'sync-playlist',
+  'sync-device-screens',
   'get-pending-auth-url',
   'start-player',
   'stop-player',
   'player-pause',
   'player-resume',
   'player-inactive',
-  'install-update'
+  'install-update',
+  'start-secondary-players',
+  'close-secondary-players',
+  'player-ready'
 ] as const satisfies readonly InvokeChannel[]
 
 /** Fire-and-forget renderer→main channels — populated in later tasks. */
 export const SEND_CHANNELS: readonly string[] = []
 
 /** Main→renderer push-event channels — populated in later tasks. */
-export const EVENT_CHANNELS: readonly string[] = ['auth-url', 'auth-window-state', 'update-downloaded']
+export const EVENT_CHANNELS: readonly string[] = ['auth-url', 'auth-window-state', 'update-downloaded', 'monitor-closed', 'start-countdown']
 
 // Compile-time guard: every contract channel must appear in INVOKE_CHANNELS.
 type UnlistedChannel = Exclude<InvokeChannel, (typeof INVOKE_CHANNELS)[number]>

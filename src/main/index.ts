@@ -10,14 +10,14 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 app.setName('Variabl')
 
-export function loadDashboard() {
-  const win = BrowserWindow.getAllWindows()[0]
+export function loadDashboard(targetWin?: BrowserWindow, searchParams: string = '') {
+  const win = targetWin || BrowserWindow.getAllWindows()[0]
   if (!win) return
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}${searchParams}`)
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, '../renderer/index.html'), { search: searchParams })
   }
 }
 

@@ -1,6 +1,7 @@
 import { Playlist } from '../stores/useAppStore'
 import { useAuthStore } from '../stores/useAuthStore'
-import { rtdb, rtdbRef, rtdbSet } from '../lib/firebase'
+import { db, doc, setDoc } from '../lib/firebase'
+import { getStoredScreenId } from './DeviceSyncService'
 
 /**
  * SyncService is responsible for syncing tab-specific parameters (like zoom and scroll)
@@ -32,16 +33,17 @@ export class SyncService {
         
         if (displayId && userId) {
           try {
-            await rtdbSet(rtdbRef(rtdb, `playlists/${playlist.id}`), {
+            const screenId = getStoredScreenId(displayId)
+            await setDoc(doc(db, 'playlists', playlist.id), {
               lastUpdatedAt: Date.now(),
-              updatedBy: `screen_${displayId}`,
+              updatedBy: screenId,
               userId: userId
-            })
+            }, { merge: true })
           } catch (err) {
-            console.error('[SyncService] Failed to notify RTDB of playlist sync:', err)
+            console.error('[SyncService] Failed to notify Firestore of playlist sync:', err)
           }
         } else {
-          console.warn('[SyncService] Missing displayId or userId, skipping RTDB update', { displayId, userId })
+          console.warn('[SyncService] Missing displayId or userId, skipping Firestore update', { displayId, userId })
         }
 
         console.log(`[SyncService] Successfully synced playlist ${playlist.id} to backend.`)

@@ -36,16 +36,20 @@ interface AppState {
   currentView: AppView
   selectedMonitorId: number | null
   selectedPlaylist: Playlist | null
+  monitorAssignments: Record<number, Playlist | null>
   navigate: (view: AppView) => void
   setSelectedMonitorId: (id: number | null) => void
   setSelectedPlaylist: (playlist: Playlist | null) => void
+  setMonitorAssignments: (assignments: Record<number, Playlist | null>) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
   currentView: 'onboarding',
   selectedMonitorId: null,
   selectedPlaylist: null,
+  monitorAssignments: {},
   navigate: (currentView) => set({ currentView }),
   setSelectedMonitorId: (selectedMonitorId) => set({ selectedMonitorId }),
-  setSelectedPlaylist: (selectedPlaylist) => set({ selectedPlaylist })
+  setSelectedPlaylist: (selectedPlaylist) => set({ selectedPlaylist }),
+  setMonitorAssignments: (monitorAssignments) => set({ monitorAssignments })
 }))

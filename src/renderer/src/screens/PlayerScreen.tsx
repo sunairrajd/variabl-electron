@@ -4,17 +4,16 @@ import { Loader2, Smartphone } from 'lucide-react'
 import PlayerOverlayScreen from './PlayerOverlayScreen'
 import { SyncService } from '@/services/SyncService'
 import RendererContainer from '@/components/renderers/RendererContainer'
-import { rtdb, rtdbRef, rtdbUpdate } from '@/lib/firebase'
-import { onValue } from 'firebase/database'
+import { db, doc, updateDoc, onSnapshot } from '@/lib/firebase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { GradientWaveText } from '@/components/ui/gradient-wave-text'
 
 const isWebsiteTab = (tab: PlaylistTab | null) => {
   if (!tab) return true;
-  const isYoutube = tab.type === 'youtube' || 
-                    tab.faviconURL?.includes('youtube.com') || 
-                    tab.url?.includes('youtube.com') || 
-                    tab.url?.includes('youtu.be');
+  const isYoutube = tab.type === 'youtube' ||
+    tab.faviconURL?.includes('youtube.com') ||
+    tab.url?.includes('youtube.com') ||
+    tab.url?.includes('youtu.be');
   return !['youtube', 'image', 'message', 'announcement', 'gsheet'].includes(tab.type) && !isYoutube;
 }
 
@@ -23,20 +22,24 @@ export default function PlayerScreen() {
   const selectedPlaylist = useAppStore((s) => s.selectedPlaylist)
   const displayId = useAuthStore((s) => s.displayId)
   const userId = useAuthStore((s) => s.firebaseUser?.uid)
+  const selectedMonitorId = useAppStore((s) => s.selectedMonitorId)
   const webviewARef = useRef<any>(null)
 
   useEffect(() => {
-    if (!displayId || !selectedPlaylist?.id) return
+    if (!displayId || !selectedPlaylist?.id || !userId) return
 
     const updateNowPlaying = async (playlistId: string) => {
       try {
-        await rtdbUpdate(rtdbRef(rtdb, `screens/${displayId}`), {
+        const { getStoredScreenId } = await import('@/services/DeviceSyncService')
+        const screenId = getStoredScreenId(displayId)
+
+        await updateDoc(doc(db, 'screens', screenId), {
           nowPlayingPlaylistId: playlistId,
           updatedAt: Date.now()
         })
-        console.log(`[PlayerScreen] Updated nowPlayingPlaylistId to ${playlistId}`)
+        console.log(`[PlayerScreen] Updated nowPlayingPlaylistId to ${playlistId} in Firestore`)
       } catch (err) {
-        console.error('[PlayerScreen] Failed to update nowPlayingPlaylistId in RTDB:', err)
+        console.error('[PlayerScreen] Failed to update nowPlayingPlaylistId in Firestore:', err)
       }
     }
 
@@ -45,19 +48,18 @@ export default function PlayerScreen() {
     // Removed the cleanup function here that was setting nowPlayingPlaylistId to "".
     // Setting it to "" here causes race conditions with StrictMode or when switching playlists,
     // immediately triggering the remote control listener to navigate to the inactive screen.
-  }, [displayId, selectedPlaylist?.id])
+  }, [displayId, selectedPlaylist?.id, userId])
 
   const pendingPlaylistUpdateRef = useRef<Playlist | null>(null)
 
   useEffect(() => {
     if (!selectedPlaylist?.id || !userId) return
 
-    const signalRef = rtdbRef(rtdb, `user_signals/${userId}/lastPlaylistUpdate`)
-    const unsubscribe = onValue(signalRef, async (snapshot) => {
-      const timestamp = snapshot.val()
-      if (!timestamp) return
+    const playlistRef = doc(db, 'playlists', selectedPlaylist.id)
+    const unsubscribe = onSnapshot(playlistRef, async (snapshot) => {
+      if (!snapshot.exists()) return
 
-      console.log(`[PlayerScreen] Signal received at ${timestamp}, fetching latest playlists...`)
+      console.log(`[PlayerScreen] Playlist document updated, fetching latest playlists...`)
       try {
         const baseUrl = 'https://tabrevolver.variabl.co'
         const deviceToken = useAuthStore.getState().deviceToken
@@ -66,14 +68,36 @@ export default function PlayerScreen() {
         const updatedPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, deviceToken)
         const freshPlaylist = updatedPlaylists.find((p: any) => p.id === selectedPlaylist.id)
         if (freshPlaylist) {
-          console.log('[PlayerScreen] Playlist fetched, staging for next loop...')
-          pendingPlaylistUpdateRef.current = freshPlaylist
+          console.log('[PlayerScreen] Playlist fetched, instantly switching to new contents...')
+          setSelectedPlaylist(freshPlaylist)
+          
+          // Clear staging variable just in case
+          pendingPlaylistUpdateRef.current = null
+          
+          // Clear any pending rotation timeouts so the old playlist doesn't accidentally trigger
+          if (timerRef.current) clearTimeout(timerRef.current)
+          if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
+          if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
+          
+          // Reset core player state for a fresh start
+          setCountdown(10)
+          setFirstTabLoaded(false)
+          setCurrentIndex(0)
+          setActiveView(0)
+          setIsRotating(false)
+          
+          // Trigger the initialization useEffect
+          setForceReloadKey(Date.now())
+          console.log(`[PlayerScreen Debug] Instant switch triggered. Countdown set to 10, firstTabLoaded=false. forceReloadKey bumped.`)
         }
       } catch (err: any) {
         console.error('[PlayerScreen] Failed to fetch updated playlist:', err)
         if (err.message?.includes('401')) {
-          useAuthStore.getState().logout()
-          navigate('onboarding')
+          const newToken = await useAuthStore.getState().refreshAuthToken()
+          if (!newToken) {
+            useAuthStore.getState().logout()
+            navigate('onboarding')
+          }
         }
       }
     })
@@ -97,38 +121,108 @@ export default function PlayerScreen() {
   const [isPaused, setIsPaused] = useState(false)
   const [firstTabLoaded, setFirstTabLoaded] = useState(false)
   const [countdown, setCountdown] = useState(10)
+  const [forceReloadKey, setForceReloadKey] = useState(Date.now())
 
   const onReadyCallbackRef = useRef<(() => void) | null>(null)
   const onFailCallbackRef = useRef<(() => void) | null>(null)
 
-  const handleExit = () => {
-    // Exit kiosk mode
-    window.electronAPI.invoke('toggle-kiosk', false).catch(() => { })
-    window.electronAPI.invoke('stop-player')
+  const handleExit = async () => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const isSecondary = searchParams.has('monitorId')
+
+    if (!isSecondary) {
+      window.electronAPI.invoke('stop-player')
+    }
     navigate('inactive')
 
     if (displayId) {
-      rtdbUpdate(rtdbRef(rtdb, `screens/${displayId}`), {
-        nowPlayingPlaylistId: "",
-        updatedAt: Date.now()
-      }).catch((err) => {
-        console.error('[PlayerScreen] Failed to clear nowPlayingPlaylistId on exit:', err)
+      import('@/services/DeviceSyncService').then(({ getStoredScreenId }) => {
+        const screenId = getStoredScreenId(displayId)
+        updateDoc(doc(db, 'screens', screenId), {
+          nowPlayingPlaylistId: "",
+          updatedAt: Date.now()
+        }).catch((err) => {
+          console.error('[PlayerScreen] Failed to clear nowPlayingPlaylistId on exit:', err)
+        })
       })
+    }
+
+    // Update local assignment and sync to API
+    try {
+      const selectedMonitorId = useAppStore.getState().selectedMonitorId
+      if (selectedMonitorId) {
+        const storedStr = localStorage.getItem('monitorAssignments')
+        if (storedStr) {
+          const assignments = JSON.parse(storedStr)
+          assignments[selectedMonitorId] = null
+          localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
+          useAppStore.getState().setMonitorAssignments(assignments)
+          
+          const monitors = await window.electronAPI.invoke('get-monitors')
+          const { syncDeviceAndScreens } = await import('@/services/DeviceSyncService')
+          syncDeviceAndScreens(monitors, assignments)
+        }
+      }
+    } catch (e) {
+      console.error('Failed to sync null assignment on exit:', e)
     }
   }
 
+  const [countdownStarted, setCountdownStarted] = useState(false)
+
+  // Reset player state when a COMPLETELY DIFFERENT playlist is selected
+  const previousPlaylistIdRef = useRef<string | undefined>(selectedPlaylist?.id)
+  
   useEffect(() => {
-    if (!selectedPlaylist) return
+    if (selectedPlaylist?.id && selectedPlaylist.id !== previousPlaylistIdRef.current) {
+      console.log(`[PlayerScreen] Playlist changed from ${previousPlaylistIdRef.current} to ${selectedPlaylist.id}. Resetting player state.`)
+      previousPlaylistIdRef.current = selectedPlaylist.id
+      
+      if (timerRef.current) clearTimeout(timerRef.current)
+      if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
+      if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
+
+      // Reset core player state for a fresh start
+      setCountdown(10)
+      setFirstTabLoaded(false)
+      setCurrentIndex(0)
+      setActiveView(0)
+      setIsRotating(false)
+      setForceReloadKey(Date.now())
+    }
+  }, [selectedPlaylist?.id])
+
+  // Listen for the start-countdown event from main process
+  useEffect(() => {
+    const cleanup = window.electronAPI.on('start-countdown', () => {
+      console.log('[PlayerScreen] start-countdown event received from main process')
+      setCountdownStarted(true)
+    })
+    return cleanup
+  }, [])
+
+  // Report player-ready state when component mounts, or when monitorId / reload key changes
+  useEffect(() => {
+    setCountdownStarted(false)
+    if (selectedMonitorId) {
+      console.log(`[PlayerScreen] Reporting player-ready for monitor ${selectedMonitorId}`)
+      window.electronAPI.invoke('player-ready', selectedMonitorId).catch(console.error)
+    }
+  }, [selectedMonitorId, forceReloadKey])
+
+  useEffect(() => {
+    if (!selectedPlaylist) return undefined
+    if (!countdownStarted) return undefined
 
     if (!selectedPlaylist.tabs || selectedPlaylist.tabs.length === 0) {
       setCountdown(0)
       setFirstTabLoaded(true)
-      
+
       // Enter kiosk mode even if empty
       window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
         console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
       })
-      
+
       return undefined
     }
 
@@ -174,7 +268,7 @@ export default function PlayerScreen() {
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [selectedPlaylist?.id])
+  }, [selectedPlaylist?.id, forceReloadKey, countdownStarted])
   useEffect(() => {
     const cleanup = window.electronAPI.on('auth-window-state', (isOpen) => {
       setIsPaused(isOpen as boolean)
@@ -270,6 +364,10 @@ export default function PlayerScreen() {
     setIsRotating(true)
 
     const nextTab = actualPlaylist.tabs[nextIndex]
+    if (!nextTab) {
+      setIsRotating(false)
+      return
+    }
     const nextView = activeView === 0 ? 1 : 0
     const wv = nextView === 0 ? webviewARef.current : webviewBRef.current
 
@@ -372,11 +470,13 @@ export default function PlayerScreen() {
           return
         }
 
+        /*
         try {
           wv.loadURL(safeUrl)
         } catch (e) {
           console.error('Failed to load URL directly:', e)
         }
+        */
 
       } else {
         setActiveView(nextView)
@@ -440,6 +540,8 @@ export default function PlayerScreen() {
     if (isPaused || isRotating || !firstTabLoaded) return
 
     const currentTab = selectedPlaylist.tabs[currentIndex]
+    if (!currentTab) return
+
     const isFixed = selectedPlaylist.rotationType === 'fixed'
 
     const isYouTube = currentTab.type === 'youtube' || currentTab.faviconURL?.includes('youtube.com')
@@ -534,6 +636,7 @@ export default function PlayerScreen() {
       <div className="absolute inset-0 h-full w-full">
         {isWebsiteTab(tabA) && (
           <webview
+            key={`wv-a-${forceReloadKey}`}
             ref={(el) => { webviewARef.current = el }}
             allowpopups={"true" as any}
             src={urlA || undefined}
@@ -567,6 +670,7 @@ export default function PlayerScreen() {
 
         {isWebsiteTab(tabB) && (
           <webview
+            key={`wv-b-${forceReloadKey}`}
             ref={(el) => { webviewBRef.current = el }}
             allowpopups={"true" as any}
             src={urlB || undefined}

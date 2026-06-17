@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { db, doc, setDoc, rtdb, rtdbRef, rtdbSet, rtdbUpdate } from '@/lib/firebase'
-import { get } from 'firebase/database'
+import { db, doc, setDoc } from '@/lib/firebase'
 import playlistsImage from '../../assets/playlists.png'
 
 interface SignInStepProps {
@@ -13,6 +12,7 @@ interface SignInStepProps {
 
 export default function SignInStep({ onNext, onBack }: SignInStepProps) {
   const setDeviceToken = useAuthStore((s) => s.setDeviceToken)
+  const setRefreshToken = useAuthStore((s) => s.setRefreshToken)
   const [showManualInput, setShowManualInput] = useState(false)
   const [manualToken, setManualToken] = useState('')
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false)
@@ -21,20 +21,30 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
     if (typeof url === 'string') {
       try {
         let tokenToUse = ''
+        let refreshTokenToUse = ''
         // Handle full deep link tabrevolver://auth?token=... OR just a raw token string
         if (url.startsWith('tabrevolver://') || url.includes('token=')) {
           const cleanUrl = typeof url === 'string' ? url.replace(/\/$/, '') : url
           const parsedUrl = new URL(cleanUrl.replace('tabrevolver://', 'https://'))
           const token = parsedUrl.searchParams.get('token')
+          const refreshToken = parsedUrl.searchParams.get('refreshToken')
           if (token) {
             tokenToUse = token.replace(/\/$/, '')
+          }
+          if (refreshToken) {
+            refreshTokenToUse = refreshToken.replace(/\/$/, '')
           }
         } else if (url.trim().length > 20) {
           tokenToUse = url.trim()
         }
-
         if (tokenToUse) {
           setDeviceToken(tokenToUse)
+          if (refreshTokenToUse) {
+            setRefreshToken(refreshTokenToUse)
+          }
+
+          // Sign into Firebase Auth using the custom token endpoint
+          await useAuthStore.getState().signInToFirebase(tokenToUse)
 
           // Try to register the screen in Firebase Realtime Database
           try {
@@ -42,8 +52,16 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
 
             // Auto-assign default screen name if not set (NameStep was skipped)
             if (!screenName || !displayId) {
-              screenName = 'My Screen 1'
-              displayId = crypto.randomUUID()
+              try {
+                const monitors = await window.electronAPI.invoke('get-monitors')
+                const primaryMonitor = monitors.find((m: any) => m.isPrimary) || monitors[0]
+                screenName = primaryMonitor?.label || 'This screen'
+                displayId = primaryMonitor?.id?.toString() || crypto.randomUUID()
+              } catch (err) {
+                console.warn('Failed to get monitors for sign in, using defaults')
+                screenName = 'This screen'
+                displayId = crypto.randomUUID()
+              }
               useAuthStore.getState().setScreenData(screenName, displayId)
             }
 
@@ -58,40 +76,23 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
               }
 
               const now = Date.now()
-              const screenRefDb = rtdbRef(rtdb, `screens/${displayId}`)
-              const snapshot = await get(screenRefDb)
-
-              if (snapshot.exists()) {
-                await rtdbUpdate(screenRefDb, {
-                  userId: userId,
-                  lastSeen: now,
-                  updatedAt: now
-                })
-                await setDoc(doc(db, 'screens', displayId), {
-                  userId: userId,
-                  lastSeen: now,
-                  updatedAt: now
-                }, { merge: true })
-                console.log('[SignInStep] Successfully updated existing screen in Database')
-              } else {
-                const screenData = {
-                  createdAt: now,
-                  displayId: displayId,
-                  lastSeen: now,
-                  nowPlayingPlaylistId: "",
-                  screenName: screenName,
-                  updatedAt: now,
-                  userId: userId
-                }
-
-                // Write to Firebase Realtime Database
-                await rtdbSet(screenRefDb, screenData)
-
-                // Also write to Firestore just in case both are used
-                await setDoc(doc(db, 'screens', displayId), screenData, { merge: true })
-
-                console.log('[SignInStep] Successfully registered new screen in Database')
+              const { getStoredScreenId } = await import('@/services/DeviceSyncService')
+              const screenId = getStoredScreenId(displayId)
+              
+              // We're moving away from RTDB completely for screen management
+              const screenData = {
+                createdAt: now,
+                displayId: displayId,
+                screenId: screenId,
+                lastSeen: now,
+                nowPlayingPlaylistId: "",
+                screenName: screenName,
+                updatedAt: now
               }
+
+              // Write to Firestore directly
+              await setDoc(doc(db, 'screens', screenId), screenData, { merge: true })
+              console.log('[SignInStep] Successfully registered screen in Firestore')
             }
           } catch (err) {
             console.error('[SignInStep] Failed to save screen to Database:', err)

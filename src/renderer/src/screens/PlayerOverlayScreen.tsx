@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
-import { Play, Pause, SkipForward, SkipBack, X, Search, Maximize, Link2, ArrowUp, ArrowDown, ZoomIn, ArrowUpDown } from 'lucide-react'
+import { Play, Pause, SkipForward, SkipBack, X, Search, Maximize, Link2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import scrollIcon from '@/assets/scroll.svg'
+import zoomIcon from '@/assets/zoom.svg'
 import { PlaylistTab } from '@/stores/useAppStore'
 
 import browserIcon from '@/assets/apps/browser.svg'
@@ -177,31 +178,31 @@ export default function PlayerOverlayScreen({
         <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black/45 to-transparent pointer-events-none" />
 
         {toastMessage && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 mb-2 px-4 py-2 rounded-full bg-green-500/90 text-white text-sm font-medium shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 mb-2 px-4 py-2 rounded-full bg-[#1e1e1e]/95 border border-white/10 text-white text-sm font-medium shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-300">
             {toastMessage}
           </div>
         )}
 
         {/* Top Center Controls (Red) */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-[#E20029] text-white px-4 py-2 rounded-b-2xl flex items-center gap-4 pointer-events-auto shadow-lg">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-[#E20029] text-white px-3 py-1.5 rounded-b-xl flex items-center gap-3 pointer-events-auto shadow-lg">
           {/* Left Inverse Curve */}
-          <svg className="absolute top-0 -left-4 w-4 h-4 pointer-events-none" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg className="absolute top-0 -left-3 w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M16 0V16C16 7.16344 8.83656 0 0 0H16Z" fill="#E20029" />
           </svg>
           {/* Right Inverse Curve */}
-          <svg className="absolute top-0 -right-4 w-4 h-4 pointer-events-none" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg className="absolute top-0 -right-3 w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M0 0V16C0 7.16344 7.16344 0 16 0H0Z" fill="#E20029" />
           </svg>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm font-normal">{isPaused ? 'Paused' : 'Playing'}</span>
+            <span className="text-xs font-medium">{isPaused ? 'Paused' : 'Playing'}</span>
           </div>
 
-          <div className="w-px h-5 bg-white/30" />
+          <div className="w-px h-4 bg-white/30" />
 
-          <div className="flex items-center gap-2">
-            <button onClick={onPrev} disabled={isNavigating} className="p-1.5 hover:bg-white/20 rounded-md transition disabled:opacity-50">
-              <SkipBack className="h-4 w-4 fill-current" />
+          <div className="flex items-center gap-1.5">
+            <button onClick={onPrev} disabled={isNavigating} className="p-1 hover:bg-white/20 rounded-md transition disabled:opacity-50">
+              <SkipBack className="h-3.5 w-3.5 fill-current" />
             </button>
             <button
               onClick={() => {
@@ -218,13 +219,13 @@ export default function PlayerOverlayScreen({
                   callbacksRef.current.onPause()
                 }
               }}
-              className="flex items-center justify-center gap-1.5 bg-[#019131] hover:bg-[#0b8046] text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors w-[160px]"
+              className="flex items-center justify-center gap-1.5 bg-[#DAFA51] hover:bg-[#EEFFA6] text-[#0A600D] px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors w-[150px]"
             >
-              {isPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4 fill-current" />}
+              {isPaused ? <Play className="h-3.5 w-3.5 fill-current" /> : <Pause className="h-3.5 w-3.5 fill-current" />}
               <span>{isPaused ? 'Resume playing' : 'Pause'}</span>
             </button>
-            <button onClick={onNext} disabled={isNavigating} className="p-1.5 hover:bg-white/20 rounded-md transition disabled:opacity-50">
-              <SkipForward className="h-4 w-4 fill-current" />
+            <button onClick={onNext} disabled={isNavigating} className="p-1 hover:bg-white/20 rounded-md transition disabled:opacity-50">
+              <SkipForward className="h-3.5 w-3.5 fill-current" />
             </button>
           </div>
         </div>
@@ -296,7 +297,7 @@ export default function PlayerOverlayScreen({
                   : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
                 }`}
             >
-              <ZoomIn className="h-5 w-5 text-black" strokeWidth={2.5} />
+              <img src={zoomIcon} className="h-5 w-5" alt="Zoom" />
             </button>
 
             {activeDropdown === 'zoom' && canZoom && (

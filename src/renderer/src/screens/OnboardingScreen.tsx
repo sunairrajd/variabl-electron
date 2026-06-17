@@ -5,8 +5,7 @@ import SignInStep from '@/screens/onboarding/SignInStep'
 import PlaylistPickerStep from '@/screens/onboarding/PlaylistPickerStep'
 import { useAppStore } from '@/stores/useAppStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { rtdb, rtdbRef } from '@/lib/firebase'
-import { get } from 'firebase/database'
+import { db, doc, getDoc } from '@/lib/firebase'
 import { ArrowLeft } from 'lucide-react'
 
 import { AuroraBackground } from '@/components/ui/aurora-background'
@@ -47,12 +46,14 @@ export default function OnboardingScreen() {
       }
 
       try {
-        const snapshot = await get(rtdbRef(rtdb, `screens/${displayId}/nowPlayingPlaylistId`))
-        const playlistId = snapshot.val()
+        const { getStoredScreenId } = await import('@/services/DeviceSyncService')
+        const screenId = getStoredScreenId(displayId)
+        const snapshot = await getDoc(doc(db, 'screens', screenId))
+        const playlistId = snapshot.data()?.nowPlayingPlaylistId
         if (playlistId) {
           setPostSplashAction(() => () => {
             sessionStorage.setItem('hasSeenSplash', 'true')
-            navigate('player')
+            setStep('picker')
           })
         } else {
           setPostSplashAction(() => () => {
@@ -61,7 +62,7 @@ export default function OnboardingScreen() {
           })
         }
       } catch (err) {
-        console.error('[Onboarding] Error checking RTDB:', err)
+        console.error('[Onboarding] Error checking Firestore:', err)
         setPostSplashAction(() => () => {
           sessionStorage.setItem('hasSeenSplash', 'true')
           setStep('picker')
