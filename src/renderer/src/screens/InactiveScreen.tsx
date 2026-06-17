@@ -28,8 +28,7 @@ export default function InactiveScreen() {
   const displayName = currentScreen?.monitorModel || currentScreen?.screenName || defaultScreenName || 'This screen'
 
   const handleLogout = () => {
-    logout()
-    navigate('onboarding')
+    window.electronAPI.invoke('logout-all').catch(console.error)
   }
 
   return (
@@ -49,21 +48,6 @@ export default function InactiveScreen() {
 
         {/* Buttons */}
         <div className="w-full flex flex-col justify-center items-center gap-[1vw] mt-[2vw]">
-          <Button
-            onClick={() => {
-              if (selectedMonitorId && useAppStore.getState().monitorAssignments[selectedMonitorId]) {
-                useAppStore.getState().setSelectedPlaylist(useAppStore.getState().monitorAssignments[selectedMonitorId]!)
-                navigate('player')
-              } else if (useAppStore.getState().selectedPlaylist) {
-                navigate('player')
-              } else {
-                navigate('onboarding')
-              }
-            }}
-            className="rounded-xl bg-[#2a2a2a] hover:bg-black text-white px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] hover:shadow-lg hover:shadow-black/5 animate-cta-enter"
-          >
-            Resume playback
-          </Button>
           <Button
             onClick={() => window.electronAPI.invoke('open-external', 'https://variabl.co/app')}
             className="rounded-xl bg-slate-200/60 border-0 text-slate-700 hover:text-slate-900 hover:bg-slate-300/60 px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] animate-cta-enter backdrop-blur-sm"
@@ -124,6 +108,31 @@ export default function InactiveScreen() {
             </div>
           </div>
         )}
+
+        <div className="flex justify-center mt-4">
+          <a
+            style={{ border: 'none' }}
+            onClick={(e) => {
+              e.preventDefault()
+              window.open(
+                'https://secure.ssl.com/team/a72-1l2nckl/site_seals/741eb963-6a2bbb7b/site_report',
+                'site_report',
+                'height=600, width=400, top=100, left=100'
+              )
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.cursor = 'pointer'
+            }}
+            href="https://secure.ssl.com/team/a72-1l2nckl/site_seals/741eb963-6a2bbb7b/site_report"
+          >
+            <img
+              width="130px"
+              src="https://d2ria90rzqh48t.cloudfront.net/assets/ssl_seal_1-2be80834b7908d85e359921807290a5ce68de470fd7c3c46fcb7f2cfedb0e410.png"
+              alt="Ssl seal 1"
+              style={{ mixBlendMode: 'multiply' }}
+            />
+          </a>
+        </div>
       </div>
     </AuroraBackground>
   )

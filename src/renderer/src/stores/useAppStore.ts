@@ -37,10 +37,12 @@ interface AppState {
   selectedMonitorId: number | null
   selectedPlaylist: Playlist | null
   monitorAssignments: Record<number, Playlist | null>
+  skipCountdown: boolean
   navigate: (view: AppView) => void
   setSelectedMonitorId: (id: number | null) => void
   setSelectedPlaylist: (playlist: Playlist | null) => void
   setMonitorAssignments: (assignments: Record<number, Playlist | null>) => void
+  setSkipCountdown: (skip: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -48,8 +50,10 @@ export const useAppStore = create<AppState>((set) => ({
   selectedMonitorId: null,
   selectedPlaylist: null,
   monitorAssignments: {},
+  skipCountdown: false,
   navigate: (currentView) => set({ currentView }),
   setSelectedMonitorId: (selectedMonitorId) => set({ selectedMonitorId }),
   setSelectedPlaylist: (selectedPlaylist) => set({ selectedPlaylist }),
-  setMonitorAssignments: (monitorAssignments) => set({ monitorAssignments })
+  setMonitorAssignments: (monitorAssignments) => set({ monitorAssignments }),
+  setSkipCountdown: (skipCountdown) => set({ skipCountdown })
 }))

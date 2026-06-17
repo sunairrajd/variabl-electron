@@ -6,7 +6,7 @@ function generateId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).substring(2, 11)}`
 }
 
-function getStoredDeviceId(): string {
+export function getStoredDeviceId(): string {
   let deviceId = localStorage.getItem('deviceId')
   if (!deviceId) {
     deviceId = generateId('dev')
@@ -25,7 +25,7 @@ export function getStoredScreenId(displayId: string): string {
   return screenId
 }
 
-function generateLayoutHash(monitors: MonitorInfo[]): string {
+export function generateLayoutHash(monitors: MonitorInfo[]): string {
   const str = monitors.map(m => `${m.id}-${m.bounds.x}-${m.bounds.y}`).join('|')
   let hash = 0
   for (let i = 0; i < str.length; i++) {

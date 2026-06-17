@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import SplashStep from '@/screens/onboarding/SplashStep'
 import IntroStep from '@/screens/onboarding/IntroStep'
 import SignInStep from '@/screens/onboarding/SignInStep'
-import PlaylistPickerStep from '@/screens/onboarding/PlaylistPickerStep'
 import { useAppStore } from '@/stores/useAppStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { db, doc, getDoc } from '@/lib/firebase'
@@ -10,7 +9,7 @@ import { ArrowLeft } from 'lucide-react'
 
 import { AuroraBackground } from '@/components/ui/aurora-background'
 
-export type OnboardingStep = 'splash' | 'intro' | 'signin' | 'picker'
+export type OnboardingStep = 'splash' | 'intro' | 'signin'
 
 export default function OnboardingScreen() {
   const [step, setStep] = useState<OnboardingStep>(() => {
@@ -21,6 +20,13 @@ export default function OnboardingScreen() {
   const navigate = useAppStore((s) => s.navigate)
 
   const [postSplashAction, setPostSplashAction] = useState<(() => void) | null>(null)
+  const [isOffline, setIsOffline] = useState(false)
+
+  const checkNetworkAndProceed = async () => {
+    setIsOffline(false)
+    setPostSplashAction(null)
+    setStep('splash')
+  }
 
   useEffect(() => {
     if (step !== 'splash') return
@@ -40,33 +46,138 @@ export default function OnboardingScreen() {
       if (token && !displayId) {
         setPostSplashAction(() => () => {
           sessionStorage.setItem('hasSeenSplash', 'true')
-          setStep('picker')
+          setStep('signin')
         })
         return
       }
 
+      if (!navigator.onLine) {
+        setIsOffline(true)
+        return
+      }
+
+      setIsOffline(false)
+
       try {
-        const { getStoredScreenId } = await import('@/services/DeviceSyncService')
-        const screenId = getStoredScreenId(displayId)
-        const snapshot = await getDoc(doc(db, 'screens', screenId))
-        const playlistId = snapshot.data()?.nowPlayingPlaylistId
-        if (playlistId) {
-          setPostSplashAction(() => () => {
-            sessionStorage.setItem('hasSeenSplash', 'true')
-            setStep('picker')
-          })
-        } else {
-          setPostSplashAction(() => () => {
-            sessionStorage.setItem('hasSeenSplash', 'true')
-            setStep('picker')
-          })
+        const { getStoredScreenId, generateLayoutHash, syncDeviceAndScreens } = await import('@/services/DeviceSyncService')
+        const monitors = await window.electronAPI.invoke('get-monitors')
+        const baseUrl = 'https://tabrevolver.variabl.co'
+        let playlists: any[] = []
+        try {
+          playlists = await window.electronAPI.invoke('fetch-playlists', baseUrl, token)
+        } catch (fetchErr: any) {
+          if (fetchErr.message && fetchErr.message.includes('401')) {
+            const newToken = await useAuthStore.getState().refreshAuthToken()
+            if (!newToken) {
+              useAuthStore.getState().logout()
+              setPostSplashAction(() => () => {
+                sessionStorage.setItem('hasSeenSplash', 'true')
+                setStep('intro')
+              })
+              return
+            }
+            playlists = await window.electronAPI.invoke('fetch-playlists', baseUrl, newToken)
+          } else {
+            throw fetchErr
+          }
         }
-      } catch (err) {
-        console.error('[Onboarding] Error checking Firestore:', err)
+
+        let hasAllAssignments = true
+        let hasAnyAssignment = false
+        const newAssignments: Record<number, any> = {}
+
+        const currentLayoutHash = generateLayoutHash(monitors)
+        let previousLayoutHash = null
+        try {
+          const storedDevice = localStorage.getItem('variableDevice')
+          if (storedDevice) {
+            previousLayoutHash = JSON.parse(storedDevice).layoutHash
+          }
+        } catch (e) {
+          console.error('Failed to read previous layout hash', e)
+        }
+
+        const layoutChanged = previousLayoutHash && previousLayoutHash !== currentLayoutHash
+
+        for (const monitor of monitors) {
+          const screenId = getStoredScreenId(monitor.id.toString())
+          if (!screenId) {
+            hasAllAssignments = false
+            continue
+          }
+
+          if (layoutChanged) {
+            // If layout changed (e.g. sequence changed, monitor unplugged), do not autostart.
+            newAssignments[monitor.id] = null
+            hasAllAssignments = false
+            continue
+          }
+
+          const snapshot = await getDoc(doc(db, 'screens', screenId))
+          const playlistId = snapshot.data()?.nowPlayingPlaylistId
+
+          if (playlistId) {
+            const fullPlaylist = playlists.find((p: any) => p.id === playlistId)
+            if (fullPlaylist) {
+              newAssignments[monitor.id] = fullPlaylist
+              hasAnyAssignment = true
+            } else {
+              newAssignments[monitor.id] = null
+              hasAllAssignments = false
+            }
+          } else {
+            newAssignments[monitor.id] = null
+            hasAllAssignments = false
+          }
+        }
+
+        // Always sync on startup so backend knows about any plugged/unplugged monitors
+        syncDeviceAndScreens(monitors, newAssignments).catch(console.error)
+
+        // Always auto-start based on assignments, completely bypassing the playlist picker
         setPostSplashAction(() => () => {
           sessionStorage.setItem('hasSeenSplash', 'true')
-          setStep('picker')
+          
+          // Auto start logic
+          localStorage.setItem('monitorAssignments', JSON.stringify(newAssignments))
+          useAppStore.getState().setMonitorAssignments(newAssignments)
+          
+          window.electronAPI.invoke('start-secondary-players', newAssignments).catch(err => {
+            console.error('Failed to start secondary players:', err)
+          })
+
+          const primaryMonitorId = monitors.find((m: any) => m.isPrimary)?.id
+          if (primaryMonitorId) {
+            useAppStore.getState().setSelectedMonitorId(primaryMonitorId)
+            useAuthStore.getState().setDisplayId(primaryMonitorId.toString())
+            if (newAssignments[primaryMonitorId]) {
+              useAppStore.getState().setSelectedPlaylist(newAssignments[primaryMonitorId])
+              navigate('player')
+            } else {
+              navigate('inactive')
+            }
+          } else {
+            const firstAssigned = Object.values(newAssignments).find(p => p !== null && p !== undefined)
+            if (firstAssigned) {
+              useAppStore.getState().setSelectedPlaylist(firstAssigned)
+              navigate('player')
+            } else {
+              navigate('inactive')
+            }
+          }
         })
+
+      } catch (err) {
+        console.error('[Onboarding] Error checking Firestore:', err)
+        if (!navigator.onLine || err?.toString()?.includes('offline')) {
+          setIsOffline(true)
+        } else {
+          // If some other error happens, go to inactive screen to allow remote assignment
+          setPostSplashAction(() => () => {
+            sessionStorage.setItem('hasSeenSplash', 'true')
+            useAppStore.getState().navigate('inactive')
+          })
+        }
       }
     }
 
@@ -86,7 +197,6 @@ export default function OnboardingScreen() {
   const handleBack = () => {
     if (step === 'intro') setStep('splash')
     else if (step === 'signin') setStep('intro')
-    else if (step === 'picker') setStep('signin')
   }
 
   return (
@@ -100,21 +210,33 @@ export default function OnboardingScreen() {
         </button>
       )}
 
-      {step === 'splash' && <SplashStep onNext={handleSplashComplete} />}
-      {step === 'intro' && <IntroStep onNext={() => {
+      {isOffline && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black z-50">
+          <div className="flex flex-col items-center gap-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c3.66 0 6.99 1.4 9.5 3.71"/><path d="M14.08 8.44a6 6 0 0 1 5.08 2.32"/><path d="M1.08 9.08a10 10 0 0 1 5.56-3.52"/><path d="M2.99 14.49a6 6 0 0 1 6.84-4.81"/><path d="M4.58 19.58a2 2 0 0 1 2.89-2.82"/><path d="M22 22 2 2"/></svg>
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-white mb-2">No internet connection</h2>
+              <p className="text-slate-400 max-w-md">Variabl requires an active internet connection to load playlists and sync screen settings.</p>
+            </div>
+            <button
+              onClick={checkNetworkAndProceed}
+              className="mt-4 px-6 py-3 bg-white text-black font-medium rounded-xl hover:bg-slate-200 transition-colors active:scale-95 cursor-pointer"
+            >
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!isOffline && step === 'splash' && <SplashStep onNext={handleSplashComplete} />}
+      {!isOffline && step === 'intro' && <IntroStep onNext={() => {
         localStorage.setItem('hasSeenIntro', 'true')
         setStep('signin')
       }} onBack={handleBack} />}
-      {step === 'signin' && (
-        <SignInStep onNext={() => setStep('picker')} onBack={handleBack} />
-      )}
-      {step === 'picker' && (
-        <PlaylistPickerStep
-          onNext={() => {
-            navigate('player')
-          }}
-          onBack={handleBack}
-        />
+      {!isOffline && step === 'signin' && (
+        <SignInStep onNext={() => setStep('splash')} onBack={handleBack} />
       )}
     </AuroraBackground>
   )

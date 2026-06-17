@@ -37,11 +37,16 @@ export default function YouTubeRenderer({ tab, isActive, isPaused, onFinish, onR
     if (isActive) setHasBeenActive(true)
   }, [isActive])
 
+  const isPausedRef = useRef(isPaused)
+  useEffect(() => {
+    isPausedRef.current = isPaused
+  }, [isPaused])
+
   // CRITICAL: We MUST construct the iframe URL manually. 
   // If we use window.YT.Player, it automatically injects localhost as the origin,
   // which clashes with our https://variabl.co header spoofing and causes a 403 Forbidden!
   const embedUrl = videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${tab.mute ? '1' : '0'}&controls=0&rel=0&modestbranding=1&fs=0&iv_load_policy=3&playsinline=1&enablejsapi=1&origin=https://variabl.co`
+    ? `https://www.youtube.com/embed/${videoId}?autoplay=0&mute=${tab.mute ? '1' : '0'}&controls=0&rel=0&modestbranding=1&fs=0&iv_load_policy=3&playsinline=1&enablejsapi=1&origin=https://variabl.co`
     : null
 
   const handleLoad = () => {
@@ -101,7 +106,15 @@ export default function YouTubeRenderer({ tab, isActive, isPaused, onFinish, onR
 
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
-        if (data?.event === 'onStateChange' && data?.info === 0) {
+        if (data?.event === 'onReady' || data?.event === 'initialDelivery') {
+          const iframe = iframeRef.current
+          if (iframe?.contentWindow && isActive && !isPausedRef.current) {
+            iframe.contentWindow.postMessage(
+              JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+              '*'
+            )
+          }
+        } else if (data?.event === 'onStateChange' && data?.info === 0) {
           onFinishRef.current?.()
         }
       } catch {

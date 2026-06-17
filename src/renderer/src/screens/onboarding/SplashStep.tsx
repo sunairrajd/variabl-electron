@@ -86,7 +86,6 @@ export default function SplashStep({ onNext }: SplashStepProps) {
         <img src={variablLogo} alt="Variabl" className="h-[clamp(1.25rem,1.8vw,4.5rem)] w-auto object-contain opacity-0 animate-reveal [animation-delay:800ms]" />
         <img src={tabRevolverLogo} alt="Tab Revolver" className="h-[clamp(1.25rem,1.8vw,4.5rem)] w-auto object-contain opacity-0 animate-reveal [animation-delay:800ms]" />
       </div>
-      
       {version && (
         <div className="absolute bottom-[3vw] left-0 right-0 flex justify-center z-10">
           <div className="opacity-0 animate-reveal [animation-delay:1000ms] text-slate-400 font-mono text-[clamp(0.6rem,0.8vw,1rem)] tracking-widest uppercase">

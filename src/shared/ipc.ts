@@ -44,6 +44,8 @@ export interface IpcInvokeContract {
   'start-secondary-players': { args: [assignments: Record<number, any>]; result: void }
   'close-secondary-players': { args: []; result: void }
   'player-ready': { args: [monitorId: number]; result: void }
+  'ensure-primary-window': { args: []; result: void }
+  'logout-all': { args: []; result: void }
 }
 
 export type InvokeChannel = keyof IpcInvokeContract
@@ -77,14 +79,16 @@ export const INVOKE_CHANNELS = [
   'install-update',
   'start-secondary-players',
   'close-secondary-players',
-  'player-ready'
+  'player-ready',
+  'ensure-primary-window',
+  'logout-all'
 ] as const satisfies readonly InvokeChannel[]
 
 /** Fire-and-forget renderer→main channels — populated in later tasks. */
 export const SEND_CHANNELS: readonly string[] = []
 
 /** Main→renderer push-event channels — populated in later tasks. */
-export const EVENT_CHANNELS: readonly string[] = ['auth-url', 'auth-window-state', 'update-downloaded', 'monitor-closed', 'start-countdown']
+export const EVENT_CHANNELS: readonly string[] = ['auth-url', 'auth-window-state', 'update-downloaded', 'monitor-closed', 'start-countdown', 'force-logout']
 
 // Compile-time guard: every contract channel must appear in INVOKE_CHANNELS.
 type UnlistedChannel = Exclude<InvokeChannel, (typeof INVOKE_CHANNELS)[number]>

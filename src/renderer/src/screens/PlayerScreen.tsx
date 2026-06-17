@@ -44,10 +44,6 @@ export default function PlayerScreen() {
     }
 
     updateNowPlaying(selectedPlaylist.id)
-
-    // Removed the cleanup function here that was setting nowPlayingPlaylistId to "".
-    // Setting it to "" here causes race conditions with StrictMode or when switching playlists,
-    // immediately triggering the remote control listener to navigate to the inactive screen.
   }, [displayId, selectedPlaylist?.id, userId])
 
   const pendingPlaylistUpdateRef = useRef<Playlist | null>(null)
@@ -119,8 +115,9 @@ export default function PlayerScreen() {
   const [renderKeyA, setRenderKeyA] = useState<number>(Date.now())
   const [renderKeyB, setRenderKeyB] = useState<number>(Date.now())
   const [isPaused, setIsPaused] = useState(false)
-  const [firstTabLoaded, setFirstTabLoaded] = useState(false)
-  const [countdown, setCountdown] = useState(10)
+  const initialSkipState = useAppStore.getState().skipCountdown
+  const [firstTabLoaded, setFirstTabLoaded] = useState(initialSkipState)
+  const [countdown, setCountdown] = useState(initialSkipState ? 0 : 10)
   const [forceReloadKey, setForceReloadKey] = useState(Date.now())
 
   const onReadyCallbackRef = useRef<(() => void) | null>(null)
@@ -130,9 +127,6 @@ export default function PlayerScreen() {
     const searchParams = new URLSearchParams(window.location.search)
     const isSecondary = searchParams.has('monitorId')
 
-    if (!isSecondary) {
-      window.electronAPI.invoke('stop-player')
-    }
     navigate('inactive')
 
     if (displayId) {
@@ -168,7 +162,8 @@ export default function PlayerScreen() {
     }
   }
 
-  const [countdownStarted, setCountdownStarted] = useState(false)
+  const initialSkip = useAppStore.getState().skipCountdown
+  const [countdownStarted, setCountdownStarted] = useState(initialSkip)
 
   // Reset player state when a COMPLETELY DIFFERENT playlist is selected
   const previousPlaylistIdRef = useRef<string | undefined>(selectedPlaylist?.id)
@@ -182,9 +177,12 @@ export default function PlayerScreen() {
       if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
       if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
 
+      const shouldSkip = useAppStore.getState().skipCountdown
+
       // Reset core player state for a fresh start
-      setCountdown(10)
-      setFirstTabLoaded(false)
+      setCountdownStarted(shouldSkip)
+      setCountdown(shouldSkip ? 0 : 10)
+      setFirstTabLoaded(shouldSkip)
       setCurrentIndex(0)
       setActiveView(0)
       setIsRotating(false)
@@ -250,18 +248,31 @@ export default function PlayerScreen() {
       }
     }
 
+    const shouldSkip = useAppStore.getState().skipCountdown
+
+    if (shouldSkip) {
+      setCountdown(0)
+      setFirstTabLoaded(true)
+      useAppStore.getState().setSkipCountdown(false) // reset for next time
+      
+      window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
+        console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
+      })
+      return undefined
+    }
+
     setCountdown(10)
+
+    // Enter kiosk mode immediately when countdown begins
+    window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
+      console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
+    })
+
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer)
           setFirstTabLoaded(true)
-
-          // Enter kiosk mode when player starts
-          window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
-            console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
-          })
-
           return 0
         }
         return prev - 1
@@ -650,7 +661,7 @@ export default function PlayerScreen() {
               key={renderKeyA}
               tab={tabA}
               isActive={activeView === 0}
-              isPaused={isPaused}
+              isPaused={isPaused || !firstTabLoaded}
               onFinish={handleNext}
               onReady={() => {
                 if (activeView !== 0) {
@@ -684,7 +695,7 @@ export default function PlayerScreen() {
               key={renderKeyB}
               tab={tabB}
               isActive={activeView === 1}
-              isPaused={isPaused}
+              isPaused={isPaused || !firstTabLoaded}
               onFinish={handleNext}
               onReady={() => {
                 if (activeView !== 1) {
@@ -704,7 +715,7 @@ export default function PlayerScreen() {
       </div>
 
       <div
-        className={`absolute inset-0 flex flex-col items-center justify-center bg-black z-50 transition-opacity duration-1000 ease-in-out pointer-events-none ${firstTabLoaded ? 'opacity-0' : 'opacity-100'
+        className={`absolute inset-0 flex flex-col items-center justify-center bg-black z-50 transition-opacity ease-in-out pointer-events-none ${firstTabLoaded ? 'opacity-0 duration-1000' : 'opacity-100 duration-0'
           }`}
       >
         <GradientWaveText

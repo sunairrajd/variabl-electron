@@ -21,7 +21,7 @@ export function loadDashboard(targetWin?: BrowserWindow, searchParams: string = 
   }
 }
 
-function createWindow(): void {
+export function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 720,
@@ -51,7 +51,7 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  loadDashboard()
+  loadDashboard(win)
 }
 
 let pendingAuthUrl: string | null = null
@@ -256,7 +256,8 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('monitorId='))
+    if (!mainWindow) createWindow()
   })
 })
 

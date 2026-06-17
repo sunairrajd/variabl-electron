@@ -59,54 +59,17 @@ function App(): React.JSX.Element {
           if (assignments[monitorId]) {
             setSelectedPlaylist(assignments[monitorId])
             navigate('player')
+          } else {
+            navigate('inactive')
           }
+        } else {
+          navigate('inactive')
         }
       } catch (err) {
         console.error('Failed to load assignments for secondary window:', err)
       }
     } else {
-      // Primary Window Logic: Auto-start and monitor-closed listeners
-      const setupPrimaryWindow = async () => {
-        try {
-          const storedStr = localStorage.getItem('monitorAssignments')
-          const deviceToken = useAuthStore.getState().deviceToken
-
-          if (storedStr && deviceToken) {
-            const assignments = JSON.parse(storedStr)
-            const hasAssignments = Object.values(assignments).some(v => v !== null && v !== undefined)
-
-            if (hasAssignments) {
-              const monitors = await window.electronAPI.invoke('get-monitors')
-              const primaryMonitor = monitors.find((m: any) => m.isPrimary) || monitors[0]
-
-              if (primaryMonitor) {
-                setSelectedMonitorId(primaryMonitor.id)
-                // Ensure AuthStore displayId matches the actual hardware monitor ID
-                useAuthStore.getState().setDisplayId(primaryMonitor.id.toString())
-              }
-
-              useAppStore.getState().setMonitorAssignments(assignments)
-
-              window.electronAPI.invoke('start-secondary-players', assignments).catch(console.error)
-
-              const { syncDeviceAndScreens } = await import('@/services/DeviceSyncService')
-              await syncDeviceAndScreens(monitors, assignments) // AWAIT this so the backend creates the screen FIRST
-
-              if (primaryMonitor && assignments[primaryMonitor.id]) {
-                setSelectedPlaylist(assignments[primaryMonitor.id])
-                navigate('player')
-              } else {
-                navigate('inactive')
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Failed to auto-start:', e)
-        }
-      }
-
-      setupPrimaryWindow()
-
+      // Primary Window Logic: monitor-closed listeners
       const cleanupMonitorClosed = window.electronAPI.on('monitor-closed', async (...args: unknown[]) => {
         const closedMonitorId = args[0] as number;
         console.log(`[App] Secondary monitor ${closedMonitorId} closed.`)
@@ -127,8 +90,16 @@ function App(): React.JSX.Element {
         }
       })
 
+      const cleanupForceLogout = window.electronAPI.on('force-logout', () => {
+        console.log('[App] Received force-logout from main process')
+        sessionStorage.removeItem('hasSeenSplash')
+        useAuthStore.getState().logout()
+        useAppStore.getState().navigate('onboarding')
+      })
+
       return () => {
         cleanupMonitorClosed()
+        cleanupForceLogout()
       }
     }
   }, [])
@@ -189,6 +160,15 @@ function App(): React.JSX.Element {
         const currentSelectedPlaylist = state.selectedPlaylist
 
         if (!playlistId) {
+          const currentMonitorId = state.selectedMonitorId
+          if (currentMonitorId) {
+            const storedStr = localStorage.getItem('monitorAssignments')
+            const assignments = storedStr ? JSON.parse(storedStr) : {}
+            assignments[currentMonitorId] = null
+            localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
+            state.setMonitorAssignments(assignments)
+          }
+          state.setSelectedPlaylist(null)
           state.navigate('inactive')
           return
         }
@@ -210,6 +190,7 @@ function App(): React.JSX.Element {
 
             if (targetPlaylist) {
               console.log(`[RemoteControl] Found playlist ${playlistId}, starting playback.`)
+              state.setSkipCountdown(true)
               state.setSelectedPlaylist(targetPlaylist)
               state.navigate('player')
               return
@@ -247,6 +228,101 @@ function App(): React.JSX.Element {
       unsubscribe()
     }
   }, [displayId, currentView])
+
+  // Multi-listener for decentralized window revival (All Windows)
+  useEffect(() => {
+    if (currentView === 'onboarding') return
+
+    let isSubscribed = true
+    const unsubs: (() => void)[] = []
+
+    const setupMultiListener = async () => {
+      try {
+        const monitors = await window.electronAPI.invoke('get-monitors')
+        const { getStoredScreenId } = await import('@/services/DeviceSyncService')
+        
+        for (const monitor of monitors) {
+          // Skip the current window's monitor since its own single-listener handles it
+          if (monitor.id === useAppStore.getState().selectedMonitorId) continue
+
+          const screenId = getStoredScreenId(monitor.id.toString())
+          if (!screenId) continue
+
+          const unsub = onSnapshot(doc(db, 'screens', screenId), async (snapshot) => {
+            if (!isSubscribed || !snapshot.exists()) return
+
+            const data = snapshot.data()
+            const playlistId = data?.nowPlayingPlaylistId
+
+            if (!playlistId) return
+
+            const state = useAppStore.getState()
+            
+            // Check current assignments
+            const storedStr = localStorage.getItem('monitorAssignments')
+            const assignments = storedStr ? JSON.parse(storedStr) : {}
+            
+            // If it's already assigned correctly, do nothing
+            if (assignments[monitor.id]?.id === playlistId) return
+
+            console.log(`[MultiListener] Detected remote assignment ${playlistId} for monitor ${monitor.id}`)
+            
+            // Fetch playlist details
+            const baseUrl = 'https://tabrevolver.variabl.co'
+            const deviceToken = useAuthStore.getState().deviceToken
+            if (!deviceToken) return
+
+            try {
+              const updatedPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, deviceToken)
+              const targetPlaylist = updatedPlaylists.find((p: any) => p.id === playlistId)
+
+              if (targetPlaylist) {
+                assignments[monitor.id] = targetPlaylist
+                localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
+                state.setMonitorAssignments(assignments)
+                
+                // Safely spawn the window if it was closed, without destroying existing ones
+                if (monitor.isPrimary) {
+                  window.electronAPI.invoke('ensure-primary-window').catch(console.error)
+                } else {
+                  window.electronAPI.invoke('start-secondary-players', assignments).catch(console.error)
+                }
+              }
+            } catch (err: any) {
+              if (err.message?.includes('401')) {
+                const newToken = await useAuthStore.getState().refreshAuthToken()
+                if (newToken) {
+                  const retryPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, newToken)
+                  const targetPlaylist = retryPlaylists.find((p: any) => p.id === playlistId)
+                  if (targetPlaylist) {
+                    assignments[monitor.id] = targetPlaylist
+                    localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
+                    state.setMonitorAssignments(assignments)
+                    
+                    if (monitor.isPrimary) {
+                      window.electronAPI.invoke('ensure-primary-window').catch(console.error)
+                    } else {
+                      window.electronAPI.invoke('start-secondary-players', assignments).catch(console.error)
+                    }
+                  }
+                }
+              }
+            }
+          })
+          unsubs.push(unsub)
+        }
+      } catch (e) {
+        console.error('[MultiListener] Error setting up listeners:', e)
+      }
+    }
+
+    setupMultiListener()
+
+    return () => {
+      isSubscribed = false
+      unsubs.forEach(unsub => unsub())
+    }
+  }, [currentView])
 
 
 

@@ -5,9 +5,6 @@ import { loadDashboard } from './index'
 let secondaryWindows: BrowserWindow[] = []
 
 export function startSecondaryPlayers(assignments: Record<number, any>) {
-  // Clear any existing secondary windows
-  stopSecondaryPlayers()
-
   const displays = screen.getAllDisplays()
   const primaryDisplayId = screen.getPrimaryDisplay().id
 
@@ -28,13 +25,22 @@ export function startSecondaryPlayers(assignments: Record<number, any>) {
   Object.entries(assignments).forEach(([monitorIdStr, playlist]) => {
     const monitorId = parseInt(monitorIdStr, 10)
     
-    // Skip if it's the primary monitor or if no playlist is assigned
-    if (monitorId === primaryDisplayId || !playlist) {
+    // Skip if it's the primary monitor
+    if (monitorId === primaryDisplayId) {
       return
     }
 
     const display = displays.find((d) => d.id === monitorId)
     if (!display) return
+
+    // Check if a window already exists for this monitor
+    const existingWin = secondaryWindows.find(w => !w.isDestroyed() && w.webContents.getURL().includes(`monitorId=${monitorId}`))
+    if (existingWin) {
+      if (!existingWin.isVisible()) {
+        existingWin.show()
+      }
+      return
+    }
 
     const win = new BrowserWindow({
       x: display.bounds.x,

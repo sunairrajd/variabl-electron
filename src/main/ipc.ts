@@ -42,6 +42,32 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
     return getPendingAuthUrl ? getPendingAuthUrl() : null
   })
 
+  ipcMain.handle('ensure-primary-window', () => {
+    import('electron').then(({ BrowserWindow }) => {
+      import('./index').then(({ createWindow }) => {
+        const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('monitorId='))
+        if (!mainWindow || mainWindow.isDestroyed()) {
+          createWindow()
+        } else if (!mainWindow.isVisible()) {
+          mainWindow.show()
+        }
+      })
+    })
+  })
+
+  ipcMain.handle('logout-all', () => {
+    import('electron').then(({ BrowserWindow }) => {
+      stopSecondaryPlayers()
+      const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('monitorId='))
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('force-logout')
+        if (!mainWindow.isVisible()) {
+          mainWindow.show()
+        }
+      }
+    })
+  })
+
   ipcMain.handle('toggle-kiosk', (_, enabled: boolean) => {
     import('electron').then(({ BrowserWindow }) => {
       const mainWindow = BrowserWindow.getAllWindows()[0]
