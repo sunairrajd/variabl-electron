@@ -25,8 +25,10 @@ export function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 720,
+    minWidth: 900,
+    minHeight: 670,
     show: false,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#ffffff',
     titleBarStyle: 'hidden',
     icon: join(__dirname, '../../resources/icon.png'),
     webPreferences: {

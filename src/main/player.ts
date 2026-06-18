@@ -50,7 +50,7 @@ export function startSecondaryPlayers(assignments: Record<number, any>) {
       fullscreen: true,
       frame: false,
       show: false,
-      backgroundColor: '#0a0a0a',
+      backgroundColor: '#ffffff',
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         contextIsolation: true,
