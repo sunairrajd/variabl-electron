@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write # Needed to upload release assets
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -44,47 +47,71 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build
+      # BUILD STEP (Do NOT publish yet!)
+      - name: Build Application
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm run dist -- --publish never
 
-      - name: Install .NET
+      # ==========================================
+      # WINDOWS SPECIFIC: SIGNING
+      # ==========================================
+      - name: Install .NET (Windows)
         if: runner.os == 'Windows'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
-      - name: Install SSL.com CodeSignTool
+      - name: Install SSL.com CodeSignTool (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           dotnet tool install --global SSLCom.CodeSignTool
+          $toolPath = Join-Path $env:USERPROFILE ".dotnet\tools"
+          $toolPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Show dist files
+      - name: Sign Windows Executables
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Get-ChildItem -Recurse dist
+          # Find both the unpacked executable and the setup installer
+          $filesToSign = Get-ChildItem -Recurse dist -Filter "*.exe" | Where-Object { 
+            $_.FullName -match "win-unpacked" -or $_.Name -match "Setup" 
+          }
 
-      - name: Sign EXE
-        if: runner.os == 'Windows'
-        shell: pwsh
+          if (-not $filesToSign) {
+            throw "No EXEs found to sign."
+          }
+
+          foreach ($file in $filesToSign) {
+            Write-Host "Signing $($file.FullName)..."
+            CodeSignTool sign `
+              -input_file_path "$($file.FullName)" `
+              -username "${{ secrets.SSLCOM_USERNAME }}" `
+              -password "${{ secrets.SSLCOM_PASSWORD }}" `
+              -credential_id "${{ secrets.SSLCOM_CREDENTIAL_ID }}" `
+              -totp_secret "${{ secrets.SSLCOM_TOTP_SECRET }}"
+              
+            Write-Host "Verifying signature..."
+            Get-AuthenticodeSignature "$($file.FullName)"
+          }
+
+      # ==========================================
+      # PUBLISH TO GITHUB RELEASES
+      # ==========================================
+      - name: Upload Release Assets (macOS)
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $file = Get-ChildItem dist -Filter "*.exe" | Select-Object -First 1
+          # Upload DMG, ZIP, and auto-updater blockmap/yml files
+          gh release upload ${{ github.ref_name }} dist/*.dmg dist/*.zip dist/latest-mac.yml dist/*.blockmap --clobber
 
-          Write-Host "Signing: $($file.FullName)"
-
-          CodeSignTool sign `
-            -input_file_path $file.FullName `
-            -username "${{ secrets.SSLCOM_USERNAME }}" `
-            -password "${{ secrets.SSLCOM_PASSWORD }}" `
-            -credential_id "${{ secrets.SSLCOM_CREDENTIAL_ID }}" `
-            -totp_secret "${{ secrets.SSLCOM_TOTP_SECRET }}"
-
-      - name: Verify Signature
+      - name: Upload Release Assets (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $file = Get-ChildItem dist -Filter "*.exe" | Select-Object -First 1
-          Get-AuthenticodeSignature $file.FullName
+          # Upload Signed Setup EXE and auto-updater yml files
+          # Note: We don't upload win-unpacked, just the installer
+          gh release upload ${{ github.ref_name }} "dist/*Setup*.exe" dist/latest.yml dist/*.blockmap --clobber
