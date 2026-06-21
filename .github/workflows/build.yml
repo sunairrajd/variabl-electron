@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install pnpm
         uses: pnpm/action-setup@v3
@@ -74,7 +74,7 @@ jobs:
 
       - name: Sign Unpacked Executable
         if: runner.os == 'Windows'
-        uses: sslcom/esigner-codesign@v1
+        uses: sslcom/esigner-codesign@v1.3.2
         with:
           command: 'sign'
           username: ${{ secrets.SSLCOM_USERNAME }}
@@ -86,7 +86,7 @@ jobs:
 
       - name: Sign Installer
         if: runner.os == 'Windows'
-        uses: sslcom/esigner-codesign@v1
+        uses: sslcom/esigner-codesign@v1.3.2
         with:
           command: 'sign'
           username: ${{ secrets.SSLCOM_USERNAME }}
