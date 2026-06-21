@@ -3,12 +3,12 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' # Triggers when a new tag like v0.9.4 is pushed
+      - 'v*'
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    
+
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
@@ -44,7 +44,47 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build and Publish
+      - name: Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm run dist -- --publish always
+        run: pnpm run dist -- --publish never
+
+      - name: Install .NET
+        if: runner.os == 'Windows'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install SSL.com CodeSignTool
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet tool install --global SSLCom.CodeSignTool
+
+      - name: Show dist files
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse dist
+
+      - name: Sign EXE
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem dist -Filter "*.exe" | Select-Object -First 1
+
+          Write-Host "Signing: $($file.FullName)"
+
+          CodeSignTool sign `
+            -input_file_path $file.FullName `
+            -username "${{ secrets.SSLCOM_USERNAME }}" `
+            -password "${{ secrets.SSLCOM_PASSWORD }}" `
+            -credential_id "${{ secrets.SSLCOM_CREDENTIAL_ID }}" `
+            -totp_secret "${{ secrets.SSLCOM_TOTP_SECRET }}"
+
+      - name: Verify Signature
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem dist -Filter "*.exe" | Select-Object -First 1
+          Get-AuthenticodeSignature $file.FullName
