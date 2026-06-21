@@ -18,4 +18,5 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0]
 const db = getFirestore(app, FIRESTORE_DATABASE_ID)
 const auth = getAuth(app)
 
+
 export { db, auth, doc, updateDoc, getDoc, setDoc, onSnapshot, signInWithCustomToken, firebaseConfig }
