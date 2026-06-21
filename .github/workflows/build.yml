@@ -104,9 +104,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Upload DMG, ZIP, and auto-updater blockmap/yml files
-          gh release upload ${{ github.ref_name }} dist/*.dmg dist/*.zip dist/latest-mac.yml dist/*.blockmap --clobber
-
+         # Upload DMG and auto-updater files (macOS doesn't build a zip in your config)
+          gh release upload ${{ github.ref_name }} dist/*.dmg dist/latest-mac.yml dist/*.blockmap --clobber
+          
       - name: Upload Release Assets (Windows)
         if: runner.os == 'Windows'
         env:
