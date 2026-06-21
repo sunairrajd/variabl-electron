@@ -56,45 +56,45 @@ jobs:
       # ==========================================
       # WINDOWS SPECIFIC: SIGNING
       # ==========================================
-      - name: Install .NET (Windows)
+      - name: Find EXEs to Sign
         if: runner.os == 'Windows'
-        uses: actions/setup-dotnet@v4
+        shell: pwsh
+        run: |
+          $unpacked = Get-ChildItem -Recurse dist -Filter "*.exe" | Where-Object { $_.FullName -match "win-unpacked" } | Select-Object -First 1
+          $installer = Get-ChildItem -Recurse dist -Filter "*Setup*.exe" | Select-Object -First 1
+          
+          if (-not $unpacked -or -not $installer) {
+            throw "Could not find unpacked exe or installer."
+          }
+          
+          "UNPACKED_PATH=$($unpacked.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "INSTALLER_PATH=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "UNPACKED_DIR=$($unpacked.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "INSTALLER_DIR=$($installer.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Sign Unpacked Executable
+        if: runner.os == 'Windows'
+        uses: sslcom/esigner-codesign@v1
         with:
-          dotnet-version: '8.0.x'
+          command: 'sign'
+          username: ${{ secrets.SSLCOM_USERNAME }}
+          password: ${{ secrets.SSLCOM_PASSWORD }}
+          credential_id: ${{ secrets.SSLCOM_CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.SSLCOM_TOTP_SECRET }}
+          file_path: ${{ env.UNPACKED_PATH }}
+          output_path: ${{ env.UNPACKED_DIR }}
 
-      - name: Install SSL.com CodeSignTool (Windows)
+      - name: Sign Installer
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          dotnet tool install --global SSLCom.CodeSignTool
-          $toolPath = Join-Path $env:USERPROFILE ".dotnet\tools"
-          $toolPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-      - name: Sign Windows Executables
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          # Find both the unpacked executable and the setup installer
-          $filesToSign = Get-ChildItem -Recurse dist -Filter "*.exe" | Where-Object { 
-            $_.FullName -match "win-unpacked" -or $_.Name -match "Setup" 
-          }
-
-          if (-not $filesToSign) {
-            throw "No EXEs found to sign."
-          }
-
-          foreach ($file in $filesToSign) {
-            Write-Host "Signing $($file.FullName)..."
-            CodeSignTool sign `
-              -input_file_path "$($file.FullName)" `
-              -username "${{ secrets.SSLCOM_USERNAME }}" `
-              -password "${{ secrets.SSLCOM_PASSWORD }}" `
-              -credential_id "${{ secrets.SSLCOM_CREDENTIAL_ID }}" `
-              -totp_secret "${{ secrets.SSLCOM_TOTP_SECRET }}"
-              
-            Write-Host "Verifying signature..."
-            Get-AuthenticodeSignature "$($file.FullName)"
-          }
+        uses: sslcom/esigner-codesign@v1
+        with:
+          command: 'sign'
+          username: ${{ secrets.SSLCOM_USERNAME }}
+          password: ${{ secrets.SSLCOM_PASSWORD }}
+          credential_id: ${{ secrets.SSLCOM_CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.SSLCOM_TOTP_SECRET }}
+          file_path: ${{ env.INSTALLER_PATH }}
+          output_path: ${{ env.INSTALLER_DIR }}
 
       # ==========================================
       # PUBLISH TO GITHUB RELEASES
