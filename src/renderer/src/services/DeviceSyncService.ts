@@ -160,6 +160,5 @@ export async function syncDeviceAndScreens(monitors: MonitorInfo[], assignments:
 
   } catch (error: any) {
     console.error('Failed to sync device and screens:', error)
-    alert(`Sync failed: ${error?.message || String(error)}`)
   }
 }

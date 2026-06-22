@@ -240,6 +240,18 @@ app.whenReady().then(async () => {
       }, 2 * 60 * 1000)
     })
 
+    autoUpdater.on('checking-for-update', () => {
+      console.log('[AutoUpdater] Checking for updates...')
+    })
+
+    autoUpdater.on('update-available', (info) => {
+      console.log(`[AutoUpdater] Update available! New version: ${info.version}`)
+    })
+
+    autoUpdater.on('update-not-available', () => {
+      console.log(`[AutoUpdater] App is up to date. Current version: ${app.getVersion()}`)
+    })
+
     autoUpdater.on('error', (err) => {
       console.error('[AutoUpdater] Error during update:', err)
     })
