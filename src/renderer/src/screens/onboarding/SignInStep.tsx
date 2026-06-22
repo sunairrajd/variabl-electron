@@ -172,6 +172,8 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
         </div>
       </div>
 
+
+
       {/* Pinned Footer with button & manual toggle */}
       <div className="w-full flex flex-col justify-center items-center gap-[1vw]">
         {!showManualInput ? (
