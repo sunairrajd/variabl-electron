@@ -32,17 +32,19 @@ function App(): React.JSX.Element {
   useEffect(() => {
     if (!isUpdateReady) return
 
-    if (updateCountdown <= 0) {
-      window.electronAPI.invoke('install-update')
-      return
-    }
-
     const timer = setInterval(() => {
       decrementUpdateCountdown()
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [isUpdateReady, updateCountdown, decrementUpdateCountdown])
+  }, [isUpdateReady, decrementUpdateCountdown])
+
+  // Trigger update when countdown hits 0
+  useEffect(() => {
+    if (isUpdateReady && updateCountdown <= 0) {
+      window.electronAPI.invoke('install-update')
+    }
+  }, [isUpdateReady, updateCountdown])
 
   // Listen to auto-updater ready event
   useEffect(() => {
@@ -361,12 +363,13 @@ function App(): React.JSX.Element {
     <>
       <Screen />
 
-      {/* Subtle Toast Banner for Admin Interfaces (when > 30s remaining) */}
-      {isUpdateReady && updateCountdown > 30 && currentView !== 'player' && (
+
+
+      {/* Subtle Toast Banner for Admin Interfaces (when > 6s remaining) */}
+      {isUpdateReady && updateCountdown > 6 && currentView !== 'player' && (
         <div className="fixed bottom-6 right-6 z-[9999] bg-slate-900 text-white px-5 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-5 duration-500 border border-slate-700/50">
           <div className="flex flex-col">
             <span className="font-medium text-sm">Update downloaded</span>
-            <span className="text-xs text-slate-400 mt-0.5">App will restart automatically in {updateCountdown} sec.</span>
           </div>
           <button
             onClick={() => window.electronAPI.invoke('install-update')}
@@ -377,8 +380,8 @@ function App(): React.JSX.Element {
         </div>
       )}
 
-      {/* Massive Universal Warning Overlay (last 30s) */}
-      {isUpdateReady && updateCountdown <= 30 && (
+      {/* Massive Universal Warning Overlay (last 6s) */}
+      {isUpdateReady && updateCountdown <= 6 && (
         <div className="fixed inset-0 z-[10000] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-500 backdrop-blur-md">
           <div className="absolute top-12 text-slate-500 text-2xl font-mono tracking-widest">
             00:{updateCountdown.toString().padStart(2, '0')}
