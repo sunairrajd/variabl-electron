@@ -191,13 +191,23 @@ export default function PlayerScreen() {
     }
   }, [selectedPlaylist?.id])
 
-  // Listen for the start-countdown event from main process
+  // Listen for the start-countdown event from main process, with a 5-second fallback
   useEffect(() => {
     const cleanup = window.electronAPI.on('start-countdown', () => {
       console.log('[PlayerScreen] start-countdown event received from main process')
       setCountdownStarted(true)
     })
-    return cleanup
+    
+    // Fallback: If IPC is lost or delayed, force start after 5 seconds
+    const fallbackTimer = setTimeout(() => {
+      console.log('[PlayerScreen] start-countdown fallback triggered')
+      setCountdownStarted(true)
+    }, 5000)
+
+    return () => {
+      cleanup()
+      clearTimeout(fallbackTimer)
+    }
   }, [])
 
   // Report player-ready state when component mounts, or when monitorId / reload key changes
@@ -290,8 +300,19 @@ export default function PlayerScreen() {
 
   const setSelectedPlaylist = useAppStore((s) => s.setSelectedPlaylist)
 
+  useEffect(() => {
+    if (countdown <= 0) return
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase()
+      if (key === 'escape' || key === 'q' || key === 'backspace') {
+        handleExit()
+      }
+    }
 
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [countdown])
   const handleScroll = (deltaY: number) => {
     const wv = activeView === 0 ? webviewARef.current : webviewBRef.current
     if (wv) {

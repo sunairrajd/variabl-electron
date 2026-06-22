@@ -204,7 +204,7 @@ app.whenReady().then(async () => {
   import('electron').then(({ ipcMain }) => {
     ipcMain.handle('install-update', () => {
       console.log('[Main] Manual install-update triggered from renderer')
-      autoUpdater.quitAndInstall(false, true)
+      autoUpdater.quitAndInstall(true, true)
     })
   })
 
@@ -229,15 +229,15 @@ app.whenReady().then(async () => {
       // Notify all open windows that an update is ready
       BrowserWindow.getAllWindows().forEach(win => {
         if (!win.isDestroyed()) {
-          win.webContents.send('update-downloaded', info.version)
+          win.webContents.send('update-ready', info.version)
         }
       })
 
-      // Give users 10 minutes to manually restart if they are interacting, 
+      // Give users 2 minutes to manually restart if they are interacting, 
       // otherwise force restart to ensure kiosk stays updated.
       setTimeout(() => {
-        autoUpdater.quitAndInstall(false, true)
-      }, 1 * 60 * 1000)
+        autoUpdater.quitAndInstall(true, true)
+      }, 2 * 60 * 1000)
     })
 
     autoUpdater.on('error', (err) => {

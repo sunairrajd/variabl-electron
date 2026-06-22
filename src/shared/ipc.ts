@@ -88,7 +88,7 @@ export const INVOKE_CHANNELS = [
 export const SEND_CHANNELS: readonly string[] = []
 
 /** Main→renderer push-event channels — populated in later tasks. */
-export const EVENT_CHANNELS: readonly string[] = ['auth-url', 'auth-window-state', 'update-downloaded', 'monitor-closed', 'start-countdown', 'force-logout']
+export const EVENT_CHANNELS: readonly string[] = ['auth-url', 'auth-window-state', 'update-ready', 'monitor-closed', 'start-countdown', 'force-logout']
 
 // Compile-time guard: every contract channel must appear in INVOKE_CHANNELS.
 type UnlistedChannel = Exclude<InvokeChannel, (typeof INVOKE_CHANNELS)[number]>

@@ -43,6 +43,8 @@ interface AppState {
   setSelectedPlaylist: (playlist: Playlist | null) => void
   setMonitorAssignments: (assignments: Record<number, Playlist | null>) => void
   setSkipCountdown: (skip: boolean) => void
+  isUpdateReady: boolean
+  setUpdateReady: (ready: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -55,5 +57,7 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedMonitorId: (selectedMonitorId) => set({ selectedMonitorId }),
   setSelectedPlaylist: (selectedPlaylist) => set({ selectedPlaylist }),
   setMonitorAssignments: (monitorAssignments) => set({ monitorAssignments }),
-  setSkipCountdown: (skipCountdown) => set({ skipCountdown })
+  setSkipCountdown: (skipCountdown) => set({ skipCountdown }),
+  isUpdateReady: false,
+  setUpdateReady: (isUpdateReady) => set({ isUpdateReady })
 }))

@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/stores/useAppStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { AuroraBackground } from '@/components/ui/aurora-background'
-import { X, Monitor, ExternalLink, MoreHorizontal, LogOut } from 'lucide-react'
+import { X, Monitor, ExternalLink, MoreHorizontal, LogOut, RefreshCw } from 'lucide-react'
 
 export default function InactiveScreen() {
   const navigate = useAppStore((s) => s.navigate)
+  const isUpdateReady = useAppStore((s) => s.isUpdateReady)
   const logout = useAuthStore((s) => s.logout)
   const defaultScreenName = useAuthStore((s) => s.screenName)
   const authDisplayId = useAuthStore((s) => s.displayId)
@@ -61,6 +62,18 @@ export default function InactiveScreen() {
             </button>
             {isMenuOpen && (
               <div className="absolute top-full right-0 mt-2 w-48 rounded-2xl bg-white/90 backdrop-blur-md border border-slate-200/50 p-2 shadow-2xl">
+                {isUpdateReady && (
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      window.electronAPI.invoke('install-update')
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Restart to update</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false)
