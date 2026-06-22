@@ -232,12 +232,6 @@ app.whenReady().then(async () => {
           win.webContents.send('update-ready', info.version)
         }
       })
-
-      // Give users 2 minutes to manually restart if they are interacting, 
-      // otherwise force restart to ensure kiosk stays updated.
-      setTimeout(() => {
-        autoUpdater.quitAndInstall(true, true)
-      }, 2 * 60 * 1000)
     })
 
     autoUpdater.on('checking-for-update', () => {

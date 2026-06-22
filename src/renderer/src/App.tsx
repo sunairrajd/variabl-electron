@@ -25,6 +25,24 @@ function App(): React.JSX.Element {
   const setSelectedPlaylist = useAppStore((s) => s.setSelectedPlaylist)
   const isUpdateReady = useAppStore((s) => s.isUpdateReady)
   const setUpdateReady = useAppStore((s) => s.setUpdateReady)
+  const updateCountdown = useAppStore((s) => s.updateCountdown)
+  const decrementUpdateCountdown = useAppStore((s) => s.decrementUpdateCountdown)
+
+  // Auto-updater countdown logic
+  useEffect(() => {
+    if (!isUpdateReady) return
+
+    if (updateCountdown <= 0) {
+      window.electronAPI.invoke('install-update')
+      return
+    }
+
+    const timer = setInterval(() => {
+      decrementUpdateCountdown()
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [isUpdateReady, updateCountdown, decrementUpdateCountdown])
 
   // Listen to auto-updater ready event
   useEffect(() => {
@@ -342,15 +360,38 @@ function App(): React.JSX.Element {
   return (
     <>
       <Screen />
-      {isUpdateReady && currentView !== 'player' && (
+
+      {/* Subtle Toast Banner for Admin Interfaces (when > 30s remaining) */}
+      {isUpdateReady && updateCountdown > 30 && currentView !== 'player' && (
         <div className="fixed bottom-6 right-6 z-[9999] bg-slate-900 text-white px-5 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-5 duration-500 border border-slate-700/50">
           <div className="flex flex-col">
             <span className="font-medium text-sm">Update downloaded</span>
-            <span className="text-xs text-slate-400 mt-0.5">App will restart automatically in 2 mins.</span>
+            <span className="text-xs text-slate-400 mt-0.5">App will restart automatically in {updateCountdown} sec.</span>
           </div>
           <button
             onClick={() => window.electronAPI.invoke('install-update')}
             className="bg-white text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-100 transition-colors active:scale-95"
+          >
+            Restart Now
+          </button>
+        </div>
+      )}
+
+      {/* Massive Universal Warning Overlay (last 30s) */}
+      {isUpdateReady && updateCountdown <= 30 && (
+        <div className="fixed inset-0 z-[10000] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-500 backdrop-blur-md">
+          <div className="absolute top-12 text-slate-500 text-2xl font-mono tracking-widest">
+            00:{updateCountdown.toString().padStart(2, '0')}
+          </div>
+          <h1 className="text-5xl md:text-6xl text-white font-bold tracking-tight mb-4 text-center">
+            Applying Update
+          </h1>
+          <p className="text-slate-400 text-lg md:text-xl text-center max-w-md">
+            Variabl is restarting to apply the latest version in <strong className="text-white">{updateCountdown}</strong> seconds...
+          </p>
+          <button
+            onClick={() => window.electronAPI.invoke('install-update')}
+            className="mt-8 bg-blue-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-blue-500 transition-colors shadow-[0_0_20px_rgba(37,99,235,0.4)]"
           >
             Restart Now
           </button>

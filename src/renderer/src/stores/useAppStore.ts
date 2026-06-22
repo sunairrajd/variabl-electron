@@ -45,6 +45,9 @@ interface AppState {
   setSkipCountdown: (skip: boolean) => void
   isUpdateReady: boolean
   setUpdateReady: (ready: boolean) => void
+  updateCountdown: number
+  setUpdateCountdown: (count: number) => void
+  decrementUpdateCountdown: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -59,5 +62,8 @@ export const useAppStore = create<AppState>((set) => ({
   setMonitorAssignments: (monitorAssignments) => set({ monitorAssignments }),
   setSkipCountdown: (skipCountdown) => set({ skipCountdown }),
   isUpdateReady: false,
-  setUpdateReady: (isUpdateReady) => set({ isUpdateReady })
+  setUpdateReady: (isUpdateReady) => set({ isUpdateReady }),
+  updateCountdown: 120,
+  setUpdateCountdown: (updateCountdown) => set({ updateCountdown }),
+  decrementUpdateCountdown: () => set((state) => ({ updateCountdown: Math.max(0, state.updateCountdown - 1) }))
 }))
