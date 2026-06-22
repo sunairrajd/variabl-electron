@@ -249,12 +249,12 @@ app.whenReady().then(async () => {
       console.error('[AutoUpdater] Initial update check failed:', err)
     })
 
-    // Check again every 15 minutes
+    // Check again every 5 minutes
     setInterval(() => {
       autoUpdater.checkForUpdates().catch(err => {
         console.error('[AutoUpdater] Scheduled update check failed:', err)
       })
-    }, 15 * 60 * 1000)
+    }, 5 * 60 * 1000)
   }
 
   app.on('activate', () => {
