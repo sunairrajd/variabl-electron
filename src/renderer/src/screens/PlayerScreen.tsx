@@ -66,22 +66,22 @@ export default function PlayerScreen() {
         if (freshPlaylist) {
           console.log('[PlayerScreen] Playlist fetched, instantly switching to new contents...')
           setSelectedPlaylist(freshPlaylist)
-          
+
           // Clear staging variable just in case
           pendingPlaylistUpdateRef.current = null
-          
+
           // Clear any pending rotation timeouts so the old playlist doesn't accidentally trigger
           if (timerRef.current) clearTimeout(timerRef.current)
           if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
           if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
-          
+
           // Reset core player state for a fresh start
           setCountdown(10)
           setFirstTabLoaded(false)
           setCurrentIndex(0)
           setActiveView(0)
           setIsRotating(false)
-          
+
           // Trigger the initialization useEffect
           setForceReloadKey(Date.now())
           console.log(`[PlayerScreen Debug] Instant switch triggered. Countdown set to 10, firstTabLoaded=false. forceReloadKey bumped.`)
@@ -151,7 +151,7 @@ export default function PlayerScreen() {
           assignments[selectedMonitorId] = null
           localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
           useAppStore.getState().setMonitorAssignments(assignments)
-          
+
           const monitors = await window.electronAPI.invoke('get-monitors')
           const { syncDeviceAndScreens } = await import('@/services/DeviceSyncService')
           syncDeviceAndScreens(monitors, assignments)
@@ -167,12 +167,13 @@ export default function PlayerScreen() {
 
   // Reset player state when a COMPLETELY DIFFERENT playlist is selected
   const previousPlaylistIdRef = useRef<string | undefined>(selectedPlaylist?.id)
-  
+
   useEffect(() => {
     if (selectedPlaylist?.id && selectedPlaylist.id !== previousPlaylistIdRef.current) {
       console.log(`[PlayerScreen] Playlist changed from ${previousPlaylistIdRef.current} to ${selectedPlaylist.id}. Resetting player state.`)
       previousPlaylistIdRef.current = selectedPlaylist.id
-      
+
+
       if (timerRef.current) clearTimeout(timerRef.current)
       if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
       if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
@@ -254,7 +255,7 @@ export default function PlayerScreen() {
       setCountdown(0)
       setFirstTabLoaded(true)
       useAppStore.getState().setSkipCountdown(false) // reset for next time
-      
+
       window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
         console.error(`[PlayerScreen] Error attempting to enable kiosk mode: ${err.message}`)
       })
