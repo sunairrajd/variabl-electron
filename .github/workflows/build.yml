@@ -82,7 +82,12 @@ jobs:
           credential_id: ${{ secrets.SSLCOM_CREDENTIAL_ID }}
           totp_secret: ${{ secrets.SSLCOM_TOTP_SECRET }}
           file_path: ${{ env.UNPACKED_PATH }}
-          output_path: ${{ env.UNPACKED_DIR }}
+          output_path: ${{ env.UNPACKED_DIR }}/signed
+
+      - name: Replace Unpacked Executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Move-Item -Path "${{ env.UNPACKED_DIR }}/signed/*" -Destination "${{ env.UNPACKED_DIR }}" -Force
 
       - name: Sign Installer
         if: runner.os == 'Windows'
@@ -94,7 +99,12 @@ jobs:
           credential_id: ${{ secrets.SSLCOM_CREDENTIAL_ID }}
           totp_secret: ${{ secrets.SSLCOM_TOTP_SECRET }}
           file_path: ${{ env.INSTALLER_PATH }}
-          output_path: ${{ env.INSTALLER_DIR }}
+          output_path: ${{ env.INSTALLER_DIR }}/signed
+
+      - name: Replace Installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Move-Item -Path "${{ env.INSTALLER_DIR }}/signed/*" -Destination "${{ env.INSTALLER_DIR }}" -Force
 
       # ==========================================
       # PUBLISH TO GITHUB RELEASES
