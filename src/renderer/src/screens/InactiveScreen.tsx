@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/stores/useAppStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { AuroraBackground } from '@/components/ui/aurora-background'
-import { LogOut } from 'lucide-react'
+import { X, Monitor, ExternalLink, MoreHorizontal, LogOut } from 'lucide-react'
 
 export default function InactiveScreen() {
   const navigate = useAppStore((s) => s.navigate)
@@ -11,7 +11,9 @@ export default function InactiveScreen() {
   const defaultScreenName = useAuthStore((s) => s.screenName)
   const authDisplayId = useAuthStore((s) => s.displayId)
   const selectedMonitorId = useAppStore((s) => s.selectedMonitorId)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [deviceInfo, setDeviceInfo] = useState<any>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   useEffect(() => {
     try {
@@ -24,6 +26,16 @@ export default function InactiveScreen() {
     }
   }, [])
 
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine)
+    window.addEventListener('online', updateOnlineStatus)
+    window.addEventListener('offline', updateOnlineStatus)
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus)
+      window.removeEventListener('offline', updateOnlineStatus)
+    }
+  }, [])
+
   const currentScreen = deviceInfo?.screens?.find((s: any) => s.displayId === (selectedMonitorId ? String(selectedMonitorId) : authDisplayId))
   const displayName = currentScreen?.monitorModel || currentScreen?.screenName || defaultScreenName || 'This screen'
 
@@ -31,108 +43,112 @@ export default function InactiveScreen() {
     window.electronAPI.invoke('logout-all').catch(console.error)
   }
 
+  const handleExitDisplay = () => {
+    window.close()
+  }
+
   return (
     <AuroraBackground className="w-full relative">
-      <div className="flex flex-col justify-center items-center w-full h-full p-[3vw] gap-[2vw] opacity-0 animate-screen-enter">
-        {/* Title Area */}
+      <div className="flex flex-col justify-between items-center w-full h-full p-[3vw] opacity-0 animate-screen-enter relative z-10">
+
+        <div className="absolute top-2 right-4 pointer-events-auto flex items-center gap-2 z-50">
+          <div className="relative">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="text-slate-400 hover:text-slate-600 hover:bg-black/5 p-2 rounded-full transition-colors flex items-center justify-center"
+            >
+              <MoreHorizontal className="h-7 w-7" strokeWidth={2.5} />
+            </button>
+            {isMenuOpen && (
+              <div className="absolute top-full right-0 mt-2 w-48 rounded-2xl bg-white/90 backdrop-blur-md border border-slate-200/50 p-2 shadow-2xl">
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false)
+                    handleLogout()
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 transition hover:bg-red-50 hover:text-red-600"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleExitDisplay}
+            className="text-slate-400 hover:text-slate-600 hover:bg-black/5 p-2 rounded-full transition-colors flex items-center justify-center"
+          >
+            <X className="h-7 w-7" strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {/* Pinned Header Spacer & Title Area */}
         <div className="w-full flex flex-col items-center">
-          <div className="text-center max-w-[45vw] min-w-[320px]">
+          <div className="w-full flex items-center justify-between relative">
+            <div className="h-[clamp(2.5rem,3.2vw,4.5rem)] w-[clamp(2.5rem,3.2vw,4.5rem)] opacity-0" />
+            <div className="h-[clamp(2.5rem,3.2vw,4.5rem)] opacity-0" />
+          </div>
+
+          <div className="text-center max-w-[45vw] min-w-[320px] mt-[1vw]">
             <h1 className="text-[clamp(1.2rem,2vw,2.8rem)] font-light text-slate-700 mb-[1vw] tracking-[-1px] leading-[1.1]">
-              '{displayName}' is currently inactive
+              Nothing Playing
             </h1>
             <p className="text-[clamp(0.75rem,0.9vw,1.2rem)] font-normal text-slate-400">
-              Resume playback on this device or control screens remotely from www.variabl.co
+              This display is online and not playing any content.
             </p>
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="w-full flex flex-col justify-center items-center gap-[1vw] mt-[2vw]">
-          <Button
-            onClick={() => window.electronAPI.invoke('open-external', 'https://variabl.co/app')}
-            className="rounded-xl bg-slate-200/60 border-0 text-slate-700 hover:text-slate-900 hover:bg-slate-300/60 px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] animate-cta-enter backdrop-blur-sm"
-          >
-            Manage this screen on variabl.co
-          </Button>
-          <Button
-            onClick={handleLogout}
-            variant="ghost"
-            className="rounded-xl bg-red-100/60 text-red-600 hover:text-red-700 hover:bg-red-200/60 px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] animate-cta-enter gap-2 backdrop-blur-sm"
-          >
-            <LogOut className="w-4 h-4 md:w-5 md:h-5" />
-            Logout
-          </Button>
-        </div>
-
-        {/* Device & Screens Info */}
-        {deviceInfo && (
-          <div className="mt-[3vw] w-full max-w-[600px] bg-white/40 backdrop-blur-md rounded-2xl p-[2vw] border border-white/20 shadow-xl overflow-y-auto max-h-[30vh]">
-            <h2 className="text-slate-800 font-semibold text-[clamp(1rem,1.2vw,1.5rem)] mb-[1vw] border-b border-slate-300/50 pb-[0.5vw]">
-              Device Details
-            </h2>
-            <div className="flex flex-col gap-[0.5vw] text-slate-600 text-[clamp(0.75rem,0.9vw,1.1rem)]">
-              <div className="flex justify-between">
-                <span className="font-medium text-slate-500">Device ID:</span>
-                <span className="font-mono bg-slate-200/50 px-2 py-0.5 rounded text-slate-700">{deviceInfo.deviceId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium text-slate-500">Device Name:</span>
-                <span className="text-slate-800">{deviceInfo.deviceName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium text-slate-500">OS:</span>
-                <span className="text-slate-800">{deviceInfo.os}</span>
-              </div>
-              
-              {deviceInfo.screens && deviceInfo.screens.length > 0 && (
-                <div className="mt-[1vw]">
-                  <h3 className="text-slate-700 font-medium text-[clamp(0.9rem,1vw,1.2rem)] mb-[0.5vw]">{deviceInfo.deviceName} Screens</h3>
-                  <div className="flex flex-col gap-[0.8vw]">
-                    {deviceInfo.screens.map((screen: any, idx: number) => (
-                      <div key={screen.screenId || idx} className="bg-white/50 rounded-xl p-[1vw] border border-white/30 flex flex-col gap-[0.3vw]">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-slate-800 text-[clamp(0.85rem,1vw,1.2rem)]">{screen.screenName || `Screen ${idx + 1}`}</span>
-                          <span className="text-[clamp(0.7rem,0.8vw,1rem)] text-slate-500 font-mono">ID: {screen.screenId}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-[1vw] text-[clamp(0.75rem,0.85vw,1rem)] text-slate-600 mt-[0.3vw]">
-                          <span><strong className="font-medium text-slate-500">Model:</strong> {screen.monitorModel || 'N/A'}</span>
-                          <span><strong className="font-medium text-slate-500">Resolution:</strong> {screen.width}x{screen.height}</span>
-                          <span><strong className="font-medium text-slate-500">Position:</strong> {screen.x}, {screen.y}</span>
-                          <span><strong className="font-medium text-slate-500">Display ID:</strong> {screen.displayId}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+        {/* Centered Content */}
+        <div className="flex flex-col items-center justify-center flex-1 my-[2vw] relative w-full">
+          {/* VARIABL.CO watermark */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none -z-10">
+            {/* <h1 className="text-[8vw] font-black text-[#D3E8E8]/60 tracking-tight select-none">
+              VARIABL.CO
+            </h1> */}
           </div>
-        )}
 
-        <div className="flex justify-center mt-4">
-          <a
-            style={{ border: 'none' }}
-            onClick={(e) => {
-              e.preventDefault()
-              window.open(
-                'https://secure.ssl.com/team/a72-1l2nckl/site_seals/741eb963-6a2bbb7b/site_report',
-                'site_report',
-                'height=600, width=400, top=100, left=100'
-              )
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.cursor = 'pointer'
-            }}
-            href="https://secure.ssl.com/team/a72-1l2nckl/site_seals/741eb963-6a2bbb7b/site_report"
-          >
-            <img
-              width="130px"
-              src="https://d2ria90rzqh48t.cloudfront.net/assets/ssl_seal_1-2be80834b7908d85e359921807290a5ce68de470fd7c3c46fcb7f2cfedb0e410.png"
-              alt="Ssl seal 1"
-              style={{ mixBlendMode: 'multiply' }}
-            />
-          </a>
+          {/* Card */}
+          <div className="bg-white/60 backdrop-blur-md rounded-[1.5vw] py-[2vw] px-[3vw] border border-white/80 shadow-sm flex flex-col items-center min-w-[340px]">
+            <Monitor className="w-[2vw] h-[2vw] min-w-[24px] min-h-[24px] text-slate-400 mb-[1vw]" strokeWidth={1.5} />
+            <h2 className="text-slate-600 font-semibold text-[clamp(0.9rem,1.1vw,1.3rem)] mb-[0.3vw]">{displayName}</h2>
+            <p className="text-slate-500/80 text-[clamp(0.7rem,0.8vw,1rem)] mb-[1.5vw] tracking-wide">
+              {currentScreen?.displayId || 'Unknown'} · {deviceInfo?.deviceId || 'Unknown'}
+            </p>
+            {isOnline ? (
+              <div className="bg-[#EAF5EC] text-[#347D39] text-[clamp(0.6rem,0.7vw,0.8rem)] font-medium px-[1vw] py-[0.5vw] rounded-full flex items-center gap-[0.5vw]">
+                <div className="w-[0.4vw] h-[0.4vw] min-w-[6px] min-h-[6px] rounded-full bg-[#46A758]"></div>
+                Online
+              </div>
+            ) : (
+              <div className="bg-[#FDF0F0] text-[#C2412E] text-[clamp(0.6rem,0.7vw,0.8rem)] font-medium px-[1vw] py-[0.5vw] rounded-full flex items-center gap-[0.5vw]">
+                <div className="w-[0.4vw] h-[0.4vw] min-w-[6px] min-h-[6px] rounded-full bg-[#E13A3A]"></div>
+                Offline
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Pinned Footer */}
+        <div className="w-full flex flex-col justify-center items-center gap-[1vw]">
+          <p className="text-slate-500 text-[clamp(0.75rem,0.9vw,1.1rem)] mb-[0.5vw]">
+            Manage this display at <span className="font-bold text-slate-600">variabl.co/app</span>
+          </p>
+          <Button
+            onClick={() => window.electronAPI.invoke('open-external', 'https://variabl.co/app/screens')}
+            className="rounded-xl bg-[#2a2a2a] hover:bg-black text-white px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2"
+          >
+            Manage display <ExternalLink className="w-[clamp(1rem,1.2vw,1.5rem)] h-[clamp(1rem,1.2vw,1.5rem)]" strokeWidth={1.5} />
+          </Button>
+          <Button
+            onClick={handleExitDisplay}
+            variant="outline"
+            className="rounded-xl bg-white hover:bg-gray-50 text-slate-700 border-0 px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2"
+          >
+            Exit display
+          </Button>
+        </div>
+
       </div>
     </AuroraBackground>
   )

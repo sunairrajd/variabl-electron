@@ -33,14 +33,14 @@ export default function SplashStep({ onNext }: SplashStepProps) {
   }, [])
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black">
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-white">
       <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-[2000ms] ease-in-out ${mounted ? 'opacity-100' : 'opacity-0'}`}>
         <ShaderGradientCanvas style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
           <ShaderGradient
             animate="on"
             axesHelper="off"
-            bgColor1="#000000"
-            bgColor2="#000000"
+            bgColor1="#ffffff"
+            bgColor2="#ffffff"
             brightness={1.5}
             cAzimuthAngle={180}
             cDistance={3.6}
