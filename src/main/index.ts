@@ -204,7 +204,8 @@ app.whenReady().then(async () => {
   import('electron').then(({ ipcMain }) => {
     ipcMain.handle('install-update', () => {
       console.log('[Main] Manual install-update triggered from renderer')
-      autoUpdater.quitAndInstall(true, true)
+      // Pass false for isSilent so the NSIS progress bar is visible during the installation gap
+      autoUpdater.quitAndInstall(false, true)
     })
   })
 
