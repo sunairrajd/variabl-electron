@@ -17,6 +17,7 @@ const isWebsiteTab = (tab: PlaylistTab | null) => {
   return !['youtube', 'image', 'message', 'announcement', 'gsheet'].includes(tab.type) && !isYoutube;
 }
 
+
 export default function PlayerScreen() {
   const navigate = useAppStore((s) => s.navigate)
   const selectedPlaylist = useAppStore((s) => s.selectedPlaylist)
@@ -197,7 +198,7 @@ export default function PlayerScreen() {
       console.log('[PlayerScreen] start-countdown event received from main process')
       setCountdownStarted(true)
     })
-    
+
     // Fallback: If IPC is lost or delayed, force start after 5 seconds
     const fallbackTimer = setTimeout(() => {
       console.log('[PlayerScreen] start-countdown fallback triggered')

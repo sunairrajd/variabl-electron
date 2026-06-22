@@ -109,6 +109,13 @@ jobs:
       # ==========================================
       # PUBLISH TO GITHUB RELEASES
       # ==========================================
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release create ${{ github.ref_name }} --title "Release ${{ github.ref_name }}" --notes "Automated release" || echo "Release already exists"
+
       - name: Upload Release Assets (macOS)
         if: runner.os == 'macOS'
         env:
