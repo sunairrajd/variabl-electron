@@ -145,7 +145,7 @@ function App(): React.JSX.Element {
         try {
           const { getStoredScreenId } = await import('@/services/DeviceSyncService')
           screenId = getStoredScreenId(displayId)
-        } catch (e) {}
+        } catch (e) { }
 
         await updateDoc(doc(db, 'screens', screenId), {
           lastSeen: Date.now()
@@ -169,26 +169,19 @@ function App(): React.JSX.Element {
     if (!displayId || currentView === 'onboarding') return
 
     let isSubscribed = true
-    let unsubscribe = () => {}
+    let unsubscribe = () => { }
 
     const setupListener = async () => {
       let screenId = displayId
       try {
         const { getStoredScreenId } = await import('@/services/DeviceSyncService')
         screenId = getStoredScreenId(displayId)
-      } catch (e) {}
+      } catch (e) { }
 
       if (!isSubscribed) return
 
-      let isInitialSnapshot = true
-
       const screenRef = doc(db, 'screens', screenId)
       unsubscribe = onSnapshot(screenRef, (snapshot) => {
-        if (isInitialSnapshot) {
-          isInitialSnapshot = false
-          return
-        }
-
         if (!snapshot.exists()) return
 
         const data = snapshot.data()
@@ -258,7 +251,7 @@ function App(): React.JSX.Element {
         tryFetch()
       })
     }
-    
+
     setupListener()
 
     return () => {
@@ -278,7 +271,7 @@ function App(): React.JSX.Element {
       try {
         const monitors = await window.electronAPI.invoke('get-monitors')
         const { getStoredScreenId } = await import('@/services/DeviceSyncService')
-        
+
         for (const monitor of monitors) {
           // Skip the current window's monitor since its own single-listener handles it
           if (monitor.id === useAppStore.getState().selectedMonitorId) continue
@@ -295,16 +288,16 @@ function App(): React.JSX.Element {
             if (!playlistId) return
 
             const state = useAppStore.getState()
-            
+
             // Check current assignments
             const storedStr = localStorage.getItem('monitorAssignments')
             const assignments = storedStr ? JSON.parse(storedStr) : {}
-            
+
             // If it's already assigned correctly, do nothing
             if (assignments[monitor.id]?.id === playlistId) return
 
             console.log(`[MultiListener] Detected remote assignment ${playlistId} for monitor ${monitor.id}`)
-            
+
             // Fetch playlist details
             const baseUrl = 'https://tabrevolver.variabl.co'
             const deviceToken = useAuthStore.getState().deviceToken
@@ -318,7 +311,7 @@ function App(): React.JSX.Element {
                 assignments[monitor.id] = targetPlaylist
                 localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
                 state.setMonitorAssignments(assignments)
-                
+
                 // Safely spawn the window if it was closed, without destroying existing ones
                 if (monitor.isPrimary) {
                   window.electronAPI.invoke('ensure-primary-window').catch(console.error)
@@ -336,7 +329,7 @@ function App(): React.JSX.Element {
                     assignments[monitor.id] = targetPlaylist
                     localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
                     state.setMonitorAssignments(assignments)
-                    
+
                     if (monitor.isPrimary) {
                       window.electronAPI.invoke('ensure-primary-window').catch(console.error)
                     } else {
@@ -397,7 +390,7 @@ function App(): React.JSX.Element {
             Applying Update
           </h1>
           <p className="text-slate-400 text-lg md:text-xl text-center max-w-md">
-            Variabl is restarting to apply the latest version in <strong className="text-white">{updateCountdown}</strong> seconds...
+            Variabl is restarting to apply the latest version in <strong className="text-white">{updateCountdown}</strong> seconds
           </p>
           <button
             onClick={() => window.electronAPI.invoke('install-update')}
