@@ -9,7 +9,7 @@ import { ArrowLeft } from 'lucide-react'
 
 import { AuroraBackground } from '@/components/ui/aurora-background'
 
-export type OnboardingStep = 'splash' | 'intro' | 'signin'
+export type OnboardingStep = 'splash' | 'intro' | 'signin' | 'checking'
 
 export default function OnboardingScreen() {
   const [step, setStep] = useState<OnboardingStep>(() => {
@@ -29,14 +29,22 @@ export default function OnboardingScreen() {
   }
 
   useEffect(() => {
-    if (step !== 'splash') return
+    if (step !== 'splash' && step !== 'checking') return
+
+    const executeOrQueue = (action: () => void) => {
+      if (step === 'checking') {
+        action()
+      } else {
+        setPostSplashAction(() => action)
+      }
+    }
 
     const determineNextStep = async () => {
       const token = useAuthStore.getState().deviceToken
       const displayId = useAuthStore.getState().displayId
 
       if (!token) {
-        setPostSplashAction(() => () => {
+        executeOrQueue(() => {
           sessionStorage.setItem('hasSeenSplash', 'true')
           setStep(localStorage.getItem('hasSeenIntro') === 'true' ? 'signin' : 'intro')
         })
@@ -44,7 +52,7 @@ export default function OnboardingScreen() {
       }
 
       if (token && !displayId) {
-        setPostSplashAction(() => () => {
+        executeOrQueue(() => {
           sessionStorage.setItem('hasSeenSplash', 'true')
           setStep('signin')
         })
@@ -70,7 +78,7 @@ export default function OnboardingScreen() {
             const newToken = await useAuthStore.getState().refreshAuthToken()
             if (!newToken) {
               useAuthStore.getState().logout()
-              setPostSplashAction(() => () => {
+              executeOrQueue(() => {
                 sessionStorage.setItem('hasSeenSplash', 'true')
                 setStep('intro')
               })
@@ -135,7 +143,7 @@ export default function OnboardingScreen() {
         syncDeviceAndScreens(monitors, newAssignments).catch(console.error)
 
         // Always auto-start based on assignments, completely bypassing the playlist picker
-        setPostSplashAction(() => () => {
+        executeOrQueue(() => {
           sessionStorage.setItem('hasSeenSplash', 'true')
           
           // Auto start logic
@@ -173,7 +181,7 @@ export default function OnboardingScreen() {
           setIsOffline(true)
         } else {
           // If some other error happens, go to inactive screen to allow remote assignment
-          setPostSplashAction(() => () => {
+          executeOrQueue(() => {
             sessionStorage.setItem('hasSeenSplash', 'true')
             useAppStore.getState().navigate('inactive')
           })
@@ -236,7 +244,12 @@ export default function OnboardingScreen() {
         setStep('signin')
       }} onBack={handleBack} />}
       {!isOffline && step === 'signin' && (
-        <SignInStep onNext={() => setStep('splash')} onBack={handleBack} />
+        <SignInStep onNext={() => setStep('checking')} onBack={handleBack} />
+      )}
+      {step === 'checking' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-transparent z-50">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600"></div>
+        </div>
       )}
     </AuroraBackground>
   )

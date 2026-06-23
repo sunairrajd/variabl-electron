@@ -180,8 +180,15 @@ function App(): React.JSX.Element {
 
       if (!isSubscribed) return
 
+      let isInitialSnapshot = true
+
       const screenRef = doc(db, 'screens', screenId)
       unsubscribe = onSnapshot(screenRef, (snapshot) => {
+        if (isInitialSnapshot) {
+          isInitialSnapshot = false
+          return
+        }
+
         if (!snapshot.exists()) return
 
         const data = snapshot.data()

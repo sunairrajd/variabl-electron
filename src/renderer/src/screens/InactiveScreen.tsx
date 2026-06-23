@@ -155,8 +155,8 @@ export default function InactiveScreen() {
           </Button>
           <Button
             onClick={handleExitDisplay}
-            variant="outline"
-            className="rounded-xl bg-white hover:bg-gray-50 text-slate-700 border-0 px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2"
+            variant="ghost"
+            className="rounded-xl bg-white hover:bg-gray-50 text-slate-700 hover:text-slate-800 border border-slate-200 px-[4vw] w-full max-w-[280px] 4k:max-w-[400px] h-[clamp(2.5rem,3.2vw,4.5rem)] text-[clamp(0.8rem,0.95vw,1.25rem)] font-medium cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.97] hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2"
           >
             Exit display
           </Button>
