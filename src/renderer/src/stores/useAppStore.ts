@@ -13,6 +13,7 @@ export interface PlaylistTab {
     enabled: boolean;
     position: number;
   };
+  reloadOnRotate?: boolean;
   mute?: boolean;
   thumbnailURL?: string;
   faviconURL?: string;

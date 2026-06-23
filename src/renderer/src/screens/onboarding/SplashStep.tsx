@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import tabRevolverLogo from '../../assets/tabrevolver.svg'
 import variablLogo from '../../assets/variabl.svg'
 import { ShaderGradientCanvas, ShaderGradient } from '@shadergradient/react'
@@ -10,6 +10,11 @@ interface SplashStepProps {
 export default function SplashStep({ onNext }: SplashStepProps) {
   const [mounted, setMounted] = useState(false)
   const [version, setVersion] = useState<string | null>(null)
+  
+  const onNextRef = useRef(onNext)
+  useEffect(() => {
+    onNextRef.current = onNext
+  }, [onNext])
 
   useEffect(() => {
     // Give the WebGL shaders a moment to compile before fading in
@@ -18,13 +23,15 @@ export default function SplashStep({ onNext }: SplashStepProps) {
     }, 800)
 
     // Automatically transition after a short delay
-    const timer = setTimeout(onNext, 8000)
+    const timer = setTimeout(() => {
+      onNextRef.current()
+    }, 8000)
 
     return () => {
       clearTimeout(fadeTimer)
       clearTimeout(timer)
     }
-  }, [onNext])
+  }, [])
 
   useEffect(() => {
     window.electronAPI.invoke('get-app-version').then((v: string) => {

@@ -556,7 +556,20 @@ export default function PlayerScreen() {
           setIsRotating(false)
         }, 3000)
 
-        const isAlreadyLoaded = (nextView === 0 && loadedUrlARef.current === safeUrl) || (nextView === 1 && loadedUrlBRef.current === safeUrl)
+        let isAlreadyLoaded = (nextView === 0 && loadedUrlARef.current === safeUrl) || (nextView === 1 && loadedUrlBRef.current === safeUrl)
+
+        if (isAlreadyLoaded && nextTab.reloadOnRotate) {
+          isAlreadyLoaded = false
+          if (nextView === 0) loadedUrlARef.current = ''
+          else loadedUrlBRef.current = ''
+          
+          try {
+            if (nextView === 0 && webviewARef.current) webviewARef.current.reload()
+            else if (nextView === 1 && webviewBRef.current) webviewBRef.current.reload()
+          } catch (e) {
+            console.error('Failed to reload webview:', e)
+          }
+        }
 
         if (!isAlreadyLoaded) {
           if (nextView === 0) setUrlA(safeUrl)
@@ -680,8 +693,28 @@ export default function PlayerScreen() {
         }
 
         let safeUrl = nextTab.url.startsWith('http') ? nextTab.url : `https://${nextTab.url}`
-        if (nextView === 0) setUrlA(safeUrl)
-        else setUrlB(safeUrl)
+        
+        let isAlreadyPreloaded = false
+        if (nextView === 0 && loadedUrlARef.current === safeUrl) isAlreadyPreloaded = true
+        if (nextView === 1 && loadedUrlBRef.current === safeUrl) isAlreadyPreloaded = true
+
+        if (isAlreadyPreloaded && nextTab.reloadOnRotate) {
+          isAlreadyPreloaded = false
+          if (nextView === 0) loadedUrlARef.current = ''
+          else loadedUrlBRef.current = ''
+          
+          try {
+             if (nextView === 0 && webviewARef.current) webviewARef.current.reload()
+             else if (nextView === 1 && webviewBRef.current) webviewBRef.current.reload()
+          } catch(e) {}
+        }
+
+        if (!isAlreadyPreloaded) {
+          if (nextView === 0) setUrlA(safeUrl)
+          else setUrlB(safeUrl)
+        } else {
+          backgroundTabReadyRef.current = true
+        }
       }
     }, preloadMs)
 
