@@ -15,6 +15,15 @@ export function getStoredDeviceId(): string {
   return deviceId
 }
 
+export function getStoredDeviceName(initialComputerName: string | null): string {
+  let deviceName = localStorage.getItem('deviceName')
+  if (!deviceName) {
+    deviceName = initialComputerName || 'Variabl Player'
+    localStorage.setItem('deviceName', deviceName)
+  }
+  return deviceName
+}
+
 export function getStoredScreenId(displayId: string): string {
   const key = `screenId_${displayId}`
   let screenId = localStorage.getItem(key)
@@ -63,7 +72,7 @@ export async function syncDeviceAndScreens(monitors: MonitorInfo[], assignments:
 
     const now = Date.now()
     const layoutHash = generateLayoutHash(monitors)
-    const deviceName = computerName || 'Variabl Player'
+    const deviceName = getStoredDeviceName(computerName)
 
     const screensData = monitors.map((monitor, index) => {
       const screenId = getStoredScreenId(monitor.id.toString())
