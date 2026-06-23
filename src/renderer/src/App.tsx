@@ -228,7 +228,6 @@ function App(): React.JSX.Element {
 
             if (targetPlaylist) {
               console.log(`[RemoteControl] Found playlist ${playlistId}, starting playback.`)
-              state.setSkipCountdown(true)
               state.setSelectedPlaylist(targetPlaylist)
               state.navigate('player')
               return

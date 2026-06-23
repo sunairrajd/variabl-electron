@@ -378,6 +378,53 @@ export default function PlayerScreen() {
     }
   }
 
+  useEffect(() => {
+    const toggleVideo = (wv: any, play: boolean) => {
+      if (!wv || !wv.executeJavaScript) return
+      const script = play ? `
+        (function() {
+          const v = document.querySelector('video');
+          if (v) v.play();
+          else {
+            const btn = document.querySelector('.ytp-play-button');
+            if (btn && btn.getAttribute('aria-label') !== 'Pause') btn.click();
+          }
+        })();
+      ` : `
+        (function() {
+          const v = document.querySelector('video');
+          if (v) v.pause();
+          else {
+            const btn = document.querySelector('.ytp-play-button');
+            if (btn && btn.getAttribute('aria-label') === 'Pause') btn.click();
+          }
+        })();
+      `
+      
+      const tryExecute = () => {
+        try {
+          if (wv && wv.executeJavaScript) {
+            wv.executeJavaScript(script).catch(() => {})
+          }
+        } catch (e) {}
+      }
+
+      // Try immediately and a few times after to catch lazy-loaded videos
+      tryExecute()
+      setTimeout(tryExecute, 1000)
+      setTimeout(tryExecute, 3000)
+      setTimeout(tryExecute, 5000)
+    }
+
+    if (activeView === 0) {
+      toggleVideo(webviewARef.current, true)
+      toggleVideo(webviewBRef.current, false)
+    } else {
+      toggleVideo(webviewARef.current, false)
+      toggleVideo(webviewBRef.current, true)
+    }
+  }, [activeView])
+
   const handleSaveScroll = () => {
     if (selectedPlaylist && selectedPlaylist.tabs) {
       SyncService.syncPlaylistSettings(selectedPlaylist)
@@ -653,7 +700,7 @@ export default function PlayerScreen() {
 
   useEffect(() => {
     if (!selectedPlaylist?.tabs || selectedPlaylist.tabs.length === 0) return
-    if (isPaused || isRotating || !firstTabLoaded) return
+    if (isPaused || isRotating || !firstTabLoaded || isCursorVisible) return
 
     const currentTab = selectedPlaylist.tabs[currentIndex]
     if (!currentTab) return
@@ -727,7 +774,7 @@ export default function PlayerScreen() {
       if (timerRef.current) clearTimeout(timerRef.current)
       if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
     }
-  }, [currentIndex, isPaused, activeView, selectedPlaylist, isRotating, firstTabLoaded])
+  }, [currentIndex, isPaused, activeView, selectedPlaylist, isRotating, firstTabLoaded, isCursorVisible])
 
   const handleNext = () => {
     if (!selectedPlaylist?.tabs) return
