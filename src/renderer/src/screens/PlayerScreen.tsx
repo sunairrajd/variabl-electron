@@ -49,12 +49,21 @@ export default function PlayerScreen() {
 
   const pendingPlaylistUpdateRef = useRef<Playlist | null>(null)
 
+  const isInitialSnapshotRef = useRef(true)
+
   useEffect(() => {
     if (!selectedPlaylist?.id || !userId) return
 
+    isInitialSnapshotRef.current = true
     const playlistRef = doc(db, 'playlists', selectedPlaylist.id)
     const unsubscribe = onSnapshot(playlistRef, async (snapshot) => {
       if (!snapshot.exists()) return
+
+      // Skip the initial snapshot since we already have the latest playlist on mount
+      if (isInitialSnapshotRef.current) {
+        isInitialSnapshotRef.current = false
+        return
+      }
 
       console.log(`[PlayerScreen] Playlist document updated, fetching latest playlists...`)
       try {
@@ -65,27 +74,8 @@ export default function PlayerScreen() {
         const updatedPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, deviceToken)
         const freshPlaylist = updatedPlaylists.find((p: any) => p.id === selectedPlaylist.id)
         if (freshPlaylist) {
-          console.log('[PlayerScreen] Playlist fetched, instantly switching to new contents...')
-          setSelectedPlaylist(freshPlaylist)
-
-          // Clear staging variable just in case
-          pendingPlaylistUpdateRef.current = null
-
-          // Clear any pending rotation timeouts so the old playlist doesn't accidentally trigger
-          if (timerRef.current) clearTimeout(timerRef.current)
-          if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
-          if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
-
-          // Reset core player state for a fresh start
-          setCountdown(10)
-          setFirstTabLoaded(false)
-          setCurrentIndex(0)
-          setActiveView(0)
-          setIsRotating(false)
-
-          // Trigger the initialization useEffect
-          setForceReloadKey(Date.now())
-          console.log(`[PlayerScreen Debug] Instant switch triggered. Countdown set to 10, firstTabLoaded=false. forceReloadKey bumped.`)
+          console.log('[PlayerScreen] Playlist fetched, staging update for next loop...')
+          pendingPlaylistUpdateRef.current = freshPlaylist
         }
       } catch (err: any) {
         console.error('[PlayerScreen] Failed to fetch updated playlist:', err)
@@ -106,11 +96,32 @@ export default function PlayerScreen() {
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const preloadTimerRef = useRef<NodeJS.Timeout | null>(null)
   const backgroundTabReadyRef = useRef(false)
+  
+  const loadedUrlARef = useRef<string>('')
+  const loadedUrlBRef = useRef<string>('')
 
   const [activeView, setActiveView] = useState(0)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [urlA, setUrlA] = useState<string>('')
   const [urlB, setUrlB] = useState<string>('')
+
+  useEffect(() => {
+    const wvA = webviewARef.current
+    if (wvA) {
+      const handleLoadA = () => { loadedUrlARef.current = urlA }
+      wvA.addEventListener('did-finish-load', handleLoadA)
+      return () => wvA.removeEventListener('did-finish-load', handleLoadA)
+    }
+  }, [urlA])
+
+  useEffect(() => {
+    const wvB = webviewBRef.current
+    if (wvB) {
+      const handleLoadB = () => { loadedUrlBRef.current = urlB }
+      wvB.addEventListener('did-finish-load', handleLoadB)
+      return () => wvB.removeEventListener('did-finish-load', handleLoadB)
+    }
+  }, [urlB])
   const [tabA, setTabA] = useState<PlaylistTab | null>(null)
   const [tabB, setTabB] = useState<PlaylistTab | null>(null)
   const [renderKeyA, setRenderKeyA] = useState<number>(Date.now())
@@ -120,9 +131,36 @@ export default function PlayerScreen() {
   const [firstTabLoaded, setFirstTabLoaded] = useState(initialSkipState)
   const [countdown, setCountdown] = useState(initialSkipState ? 0 : 10)
   const [forceReloadKey, setForceReloadKey] = useState(Date.now())
+  const [isCursorVisible, setIsCursorVisible] = useState(true)
 
   const onReadyCallbackRef = useRef<(() => void) | null>(null)
   const onFailCallbackRef = useRef<(() => void) | null>(null)
+  const cursorTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    const handleActivity = () => {
+      setIsCursorVisible(true)
+      if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current)
+      cursorTimerRef.current = setTimeout(() => {
+        setIsCursorVisible(false)
+      }, 3000)
+    }
+
+    handleActivity() // Initialize
+
+    window.addEventListener('mousemove', handleActivity)
+    window.addEventListener('mousedown', handleActivity)
+    window.addEventListener('touchstart', handleActivity)
+    window.addEventListener('keydown', handleActivity)
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity)
+      window.removeEventListener('mousedown', handleActivity)
+      window.removeEventListener('touchstart', handleActivity)
+      window.removeEventListener('keydown', handleActivity)
+      if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current)
+    }
+  }, [])
 
   const handleExit = async () => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -433,6 +471,37 @@ export default function PlayerScreen() {
           const disableScrollJS = `
             window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
             window.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+            
+            if (!window._variablCursorIdle) {
+              window._variablCursorIdle = true;
+              let cursorTimer = null;
+              const styleEl = document.createElement('style');
+              styleEl.innerHTML = '* { cursor: none !important; }';
+              let isHidden = false;
+
+              const hideCursor = () => {
+                if (!isHidden) {
+                  document.head.appendChild(styleEl);
+                  isHidden = true;
+                }
+              };
+
+              const showCursor = () => {
+                if (isHidden) {
+                  if (document.head.contains(styleEl)) document.head.removeChild(styleEl);
+                  isHidden = false;
+                }
+                clearTimeout(cursorTimer);
+                cursorTimer = setTimeout(hideCursor, 3000);
+              };
+
+              window.addEventListener('mousemove', showCursor);
+              window.addEventListener('mousedown', showCursor);
+              window.addEventListener('touchstart', showCursor);
+              window.addEventListener('keydown', showCursor);
+              cursorTimer = setTimeout(hideCursor, 3000);
+            }
+            
             const style = document.createElement('style');
             style.innerHTML = '::-webkit-scrollbar { display: none !important; }';
             document.head.appendChild(style);
@@ -487,7 +556,7 @@ export default function PlayerScreen() {
           setIsRotating(false)
         }, 3000)
 
-        const isAlreadyLoaded = (nextView === 0 && urlA === safeUrl) || (nextView === 1 && urlB === safeUrl)
+        const isAlreadyLoaded = (nextView === 0 && loadedUrlARef.current === safeUrl) || (nextView === 1 && loadedUrlBRef.current === safeUrl)
 
         if (!isAlreadyLoaded) {
           if (nextView === 0) setUrlA(safeUrl)
@@ -666,7 +735,7 @@ export default function PlayerScreen() {
   }, 0) || 0
 
   return (
-    <div className="relative w-screen h-screen bg-white overflow-hidden select-none">
+    <div className={`relative w-screen h-screen bg-black overflow-hidden select-none ${!isCursorVisible ? 'cursor-none' : ''}`}>
       <div className="absolute inset-0 h-full w-full">
         {isWebsiteTab(tabA) && (
           <webview

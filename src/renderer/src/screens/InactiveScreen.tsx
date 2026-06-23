@@ -126,7 +126,7 @@ export default function InactiveScreen() {
             <Monitor className="w-[2vw] h-[2vw] min-w-[24px] min-h-[24px] text-slate-400 mb-[1vw]" strokeWidth={1.5} />
             <h2 className="text-slate-600 font-semibold text-[clamp(0.9rem,1.1vw,1.3rem)] mb-[0.3vw]">{displayName}</h2>
             <p className="text-slate-500/80 text-[clamp(0.7rem,0.8vw,1rem)] mb-[1.5vw] tracking-wide">
-              {currentScreen?.displayId || 'Unknown'} · {deviceInfo?.deviceId || 'Unknown'}
+              {deviceInfo?.computerName || 'Unknown'}
             </p>
             {isOnline ? (
               <div className="bg-[#EAF5EC] text-[#347D39] text-[clamp(0.6rem,0.7vw,0.8rem)] font-medium px-[1vw] py-[0.5vw] rounded-full flex items-center gap-[0.5vw]">
