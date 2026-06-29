@@ -583,7 +583,7 @@ export default function PlayerScreen() {
             setActiveView(nextView)
             setCurrentIndex(nextIndex)
             setIsRotating(false)
-          }, 100)
+          }, 400)
         }
 
         const onFailLoad = () => {

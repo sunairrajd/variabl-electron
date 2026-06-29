@@ -71,9 +71,11 @@ export default function OnboardingScreen() {
         const monitors = await window.electronAPI.invoke('get-monitors')
         const baseUrl = 'https://tabrevolver.variabl.co'
         let playlists: any[] = []
+        let fetchFailed = false
         try {
           playlists = await window.electronAPI.invoke('fetch-playlists', baseUrl, token)
         } catch (fetchErr: any) {
+          console.error('[Onboarding] Error fetching playlists:', fetchErr)
           if (fetchErr.message && fetchErr.message.includes('401')) {
             const newToken = await useAuthStore.getState().refreshAuthToken()
             if (!newToken) {
@@ -86,9 +88,12 @@ export default function OnboardingScreen() {
             }
             playlists = await window.electronAPI.invoke('fetch-playlists', baseUrl, newToken)
           } else {
-            throw fetchErr
+            fetchFailed = true
           }
         }
+
+        const storedAssignmentsStr = localStorage.getItem('monitorAssignments')
+        const storedAssignments = storedAssignmentsStr ? JSON.parse(storedAssignmentsStr) : {}
 
         let hasAllAssignments = true
         let hasAnyAssignment = false
@@ -101,21 +106,40 @@ export default function OnboardingScreen() {
             continue
           }
 
-          const snapshot = await getDoc(doc(db, 'screens', screenId))
-          const playlistId = snapshot.data()?.nowPlayingPlaylistId
+          let playlistId: string | null = null
+          try {
+            const snapshot = await getDoc(doc(db, 'screens', screenId))
+            playlistId = snapshot.data()?.nowPlayingPlaylistId
+          } catch (dbErr) {
+            console.error('[Onboarding] Error fetching screen from Firestore:', dbErr)
+          }
 
           if (playlistId) {
             const fullPlaylist = playlists.find((p: any) => p.id === playlistId)
             if (fullPlaylist) {
               newAssignments[monitor.id] = fullPlaylist
               hasAnyAssignment = true
+            } else if (storedAssignments[monitor.id]?.id === playlistId) {
+              // Fallback to cached playlist if it matches the ID from Firestore
+              newAssignments[monitor.id] = storedAssignments[monitor.id]
+              hasAnyAssignment = true
             } else {
               newAssignments[monitor.id] = null
               hasAllAssignments = false
             }
           } else {
-            newAssignments[monitor.id] = null
-            hasAllAssignments = false
+            // If Firestore doesn't have an ID, but we have a cached assignment and fetch failed,
+            // or if we just want to aggressively resume, we can fallback to cached.
+            // But if Firestore explicitly has NO ID (e.g. user cleared it remotely), we should respect it.
+            // However, to fix the issue where it doesn't resume, we will use the cached assignment 
+            // if we couldn't fetch from Firestore or if it was cleared incorrectly during update.
+            if (storedAssignments[monitor.id]) {
+               newAssignments[monitor.id] = storedAssignments[monitor.id]
+               hasAnyAssignment = true
+            } else {
+               newAssignments[monitor.id] = null
+               hasAllAssignments = false
+            }
           }
         }
 
@@ -156,11 +180,10 @@ export default function OnboardingScreen() {
         })
 
       } catch (err) {
-        console.error('[Onboarding] Error checking Firestore:', err)
+        console.error('[Onboarding] Fatal error in determineNextStep:', err)
         if (!navigator.onLine || err?.toString()?.includes('offline')) {
           setIsOffline(true)
         } else {
-          // If some other error happens, go to inactive screen to allow remote assignment
           executeOrQueue(() => {
             sessionStorage.setItem('hasSeenSplash', 'true')
             useAppStore.getState().navigate('inactive')
