@@ -94,29 +94,9 @@ export default function OnboardingScreen() {
         let hasAnyAssignment = false
         const newAssignments: Record<number, any> = {}
 
-        const currentLayoutHash = generateLayoutHash(monitors)
-        let previousLayoutHash = null
-        try {
-          const storedDevice = localStorage.getItem('variableDevice')
-          if (storedDevice) {
-            previousLayoutHash = JSON.parse(storedDevice).layoutHash
-          }
-        } catch (e) {
-          console.error('Failed to read previous layout hash', e)
-        }
-
-        const layoutChanged = previousLayoutHash && previousLayoutHash !== currentLayoutHash
-
         for (const monitor of monitors) {
           const screenId = getStoredScreenId(monitor.id.toString())
           if (!screenId) {
-            hasAllAssignments = false
-            continue
-          }
-
-          if (layoutChanged) {
-            // If layout changed (e.g. sequence changed, monitor unplugged), do not autostart.
-            newAssignments[monitor.id] = null
             hasAllAssignments = false
             continue
           }

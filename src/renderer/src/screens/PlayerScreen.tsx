@@ -466,8 +466,12 @@ export default function PlayerScreen() {
 
   const [isRotating, setIsRotating] = useState(false)
   const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const currentRotationIdRef = useRef<number>(0)
 
   const triggerRotation = (nextIndex: number, force = false) => {
+    const rotationId = Date.now()
+    currentRotationIdRef.current = rotationId
+
     const pendingUpdate = pendingPlaylistUpdateRef.current
     const actualPlaylist = (pendingUpdate && nextIndex === 0) ? pendingUpdate : selectedPlaylist
 
@@ -561,6 +565,11 @@ export default function PlayerScreen() {
         }
 
         const onFinishLoad = () => {
+          if (currentRotationIdRef.current !== rotationId) {
+            wv.removeEventListener('did-finish-load', onFinishLoad)
+            wv.removeEventListener('did-fail-load', onFailLoad)
+            return
+          }
           if (rotationTimeoutRef.current) {
             clearTimeout(rotationTimeoutRef.current)
             rotationTimeoutRef.current = null
@@ -570,6 +579,7 @@ export default function PlayerScreen() {
 
           applyTabSettings()
           setTimeout(() => {
+            if (currentRotationIdRef.current !== rotationId) return
             setActiveView(nextView)
             setCurrentIndex(nextIndex)
             setIsRotating(false)
@@ -577,6 +587,11 @@ export default function PlayerScreen() {
         }
 
         const onFailLoad = () => {
+          if (currentRotationIdRef.current !== rotationId) {
+            wv.removeEventListener('did-finish-load', onFinishLoad)
+            wv.removeEventListener('did-fail-load', onFailLoad)
+            return
+          }
           if (rotationTimeoutRef.current) {
             clearTimeout(rotationTimeoutRef.current)
             rotationTimeoutRef.current = null
@@ -594,6 +609,11 @@ export default function PlayerScreen() {
         wv.addEventListener('did-fail-load', onFailLoad)
 
         rotationTimeoutRef.current = setTimeout(() => {
+          if (currentRotationIdRef.current !== rotationId) {
+            wv.removeEventListener('did-finish-load', onFinishLoad)
+            wv.removeEventListener('did-fail-load', onFailLoad)
+            return
+          }
           wv.removeEventListener('did-finish-load', onFinishLoad)
           wv.removeEventListener('did-fail-load', onFailLoad)
 
@@ -626,6 +646,7 @@ export default function PlayerScreen() {
         if (isAlreadyLoaded) {
           applyTabSettings()
           setTimeout(() => {
+            if (currentRotationIdRef.current !== rotationId) return
             setActiveView(nextView)
             setCurrentIndex(nextIndex)
             setIsRotating(false)
@@ -658,6 +679,7 @@ export default function PlayerScreen() {
           rotationTimeoutRef.current = null
         }
         setTimeout(() => {
+          if (currentRotationIdRef.current !== rotationId) return
           setActiveView(nextView)
           setCurrentIndex(nextIndex)
           setIsRotating(false)
@@ -666,11 +688,13 @@ export default function PlayerScreen() {
       }
 
       onReadyCallbackRef.current = () => {
+        if (currentRotationIdRef.current !== rotationId) return
         if (rotationTimeoutRef.current) {
           clearTimeout(rotationTimeoutRef.current)
           rotationTimeoutRef.current = null
         }
         setTimeout(() => {
+          if (currentRotationIdRef.current !== rotationId) return
           setActiveView(nextView)
           setCurrentIndex(nextIndex)
           setIsRotating(false)
@@ -678,6 +702,7 @@ export default function PlayerScreen() {
       }
 
       onFailCallbackRef.current = () => {
+        if (currentRotationIdRef.current !== rotationId) return
         if (rotationTimeoutRef.current) {
           clearTimeout(rotationTimeoutRef.current)
           rotationTimeoutRef.current = null
@@ -693,6 +718,7 @@ export default function PlayerScreen() {
       }
 
       rotationTimeoutRef.current = setTimeout(() => {
+        if (currentRotationIdRef.current !== rotationId) return
         if (onFailCallbackRef.current) onFailCallbackRef.current()
       }, 5000)
     }
@@ -823,7 +849,7 @@ export default function PlayerScreen() {
             ref={(el) => { webviewARef.current = el }}
             allowpopups={"true" as any}
             src={urlA || undefined}
-            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
+            className={`absolute inset-0 h-full w-full bg-white transition-opacity duration-1000 ease-in-out ${activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
           />
         )}
 
@@ -857,7 +883,7 @@ export default function PlayerScreen() {
             ref={(el) => { webviewBRef.current = el }}
             allowpopups={"true" as any}
             src={urlB || undefined}
-            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
+            className={`absolute inset-0 h-full w-full bg-white transition-opacity duration-1000 ease-in-out ${activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
           />
         )}
 
