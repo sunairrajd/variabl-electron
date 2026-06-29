@@ -215,7 +215,7 @@ function App(): React.JSX.Element {
         if (playlistId === currentSelectedPlaylist?.id && currentView === 'player') return
 
         let attempts = 0
-        const maxAttempts = 12 // up to 1 minute (12 * 5s)
+        const maxAttempts = 4 // up to 1 minute (4 * 15s)
 
         const tryFetch = async () => {
           try {
@@ -258,7 +258,7 @@ function App(): React.JSX.Element {
           attempts++
           if (attempts < maxAttempts) {
             console.log(`[RemoteControl] Playlist ${playlistId} not found, retrying... (${attempts}/${maxAttempts})`)
-            setTimeout(tryFetch, 8000)
+            setTimeout(tryFetch, 15000)
           } else {
             console.warn(`[RemoteControl] Could not find playlist ${playlistId} after 1 minute.`)
           }
@@ -315,7 +315,7 @@ function App(): React.JSX.Element {
             console.log(`[MultiListener] Detected remote assignment ${playlistId} for monitor ${monitor.id}`)
 
             let attempts = 0
-            const maxAttempts = 12
+            const maxAttempts = 4 // up to 1 minute (4 * 15s)
 
             const tryFetchMulti = async () => {
               const baseUrl = 'https://tabrevolver.variabl.co'
@@ -367,7 +367,7 @@ function App(): React.JSX.Element {
               attempts++
               if (attempts < maxAttempts) {
                 console.log(`[MultiListener] Playlist ${playlistId} not found, retrying... (${attempts}/${maxAttempts})`)
-                setTimeout(tryFetchMulti, 5000)
+                setTimeout(tryFetchMulti, 15000)
               } else {
                 console.warn(`[MultiListener] Could not find playlist ${playlistId} for monitor ${monitor.id} after 1 minute.`)
               }

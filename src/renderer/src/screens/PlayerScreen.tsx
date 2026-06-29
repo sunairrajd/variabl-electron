@@ -17,6 +17,56 @@ const isWebsiteTab = (tab: PlaylistTab | null) => {
   return !['youtube', 'image', 'message', 'announcement', 'gsheet'].includes(tab.type) && !isYoutube;
 }
 
+const applyWebviewSettings = (wv: any, tab: PlaylistTab) => {
+  if (!wv || !tab) return;
+  const zoomLevel = tab.zoom || 1;
+  wv.executeJavaScript(`document.documentElement.style.zoom = '${zoomLevel}';`).catch(console.error)
+
+  const disableScrollJS = `
+    window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+    window.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    
+    if (!window._variablCursorIdle) {
+      window._variablCursorIdle = true;
+      let cursorTimer = null;
+      const styleEl = document.createElement('style');
+      styleEl.innerHTML = '* { cursor: none !important; }';
+      let isHidden = false;
+
+      const hideCursor = () => {
+        if (!isHidden) {
+          document.head.appendChild(styleEl);
+          isHidden = true;
+        }
+      };
+
+      const showCursor = () => {
+        if (isHidden) {
+          if (document.head.contains(styleEl)) document.head.removeChild(styleEl);
+          isHidden = false;
+        }
+        clearTimeout(cursorTimer);
+        cursorTimer = setTimeout(hideCursor, 3000);
+      };
+
+      window.addEventListener('mousemove', showCursor);
+      window.addEventListener('mousedown', showCursor);
+      window.addEventListener('touchstart', showCursor);
+      window.addEventListener('keydown', showCursor);
+      cursorTimer = setTimeout(hideCursor, 3000);
+    }
+    
+    const style = document.createElement('style');
+    style.innerHTML = '::-webkit-scrollbar { display: none !important; }';
+    document.head.appendChild(style);
+  `
+  wv.executeJavaScript(disableScrollJS).catch(console.error)
+
+  if (tab.scroll?.enabled && tab.scroll?.position) {
+    wv.executeJavaScript(`window.scrollTo({ top: ${tab.scroll.position}, behavior: 'instant' })`).catch(console.error)
+  }
+}
+
 
 export default function PlayerScreen() {
   const navigate = useAppStore((s) => s.navigate)
@@ -105,23 +155,6 @@ export default function PlayerScreen() {
   const [urlA, setUrlA] = useState<string>('')
   const [urlB, setUrlB] = useState<string>('')
 
-  useEffect(() => {
-    const wvA = webviewARef.current
-    if (wvA) {
-      const handleLoadA = () => { loadedUrlARef.current = urlA }
-      wvA.addEventListener('did-finish-load', handleLoadA)
-      return () => wvA.removeEventListener('did-finish-load', handleLoadA)
-    }
-  }, [urlA])
-
-  useEffect(() => {
-    const wvB = webviewBRef.current
-    if (wvB) {
-      const handleLoadB = () => { loadedUrlBRef.current = urlB }
-      wvB.addEventListener('did-finish-load', handleLoadB)
-      return () => wvB.removeEventListener('did-finish-load', handleLoadB)
-    }
-  }, [urlB])
   const [tabA, setTabA] = useState<PlaylistTab | null>(null)
   const [tabB, setTabB] = useState<PlaylistTab | null>(null)
   const [renderKeyA, setRenderKeyA] = useState<number>(Date.now())
@@ -129,9 +162,33 @@ export default function PlayerScreen() {
   const [isPaused, setIsPaused] = useState(false)
   const initialSkipState = useAppStore.getState().skipCountdown
   const [firstTabLoaded, setFirstTabLoaded] = useState(initialSkipState)
-  const [countdown, setCountdown] = useState(initialSkipState ? 0 : 10)
+  const [countdown, setCountdown] = useState(initialSkipState ? 0 : 5)
   const [forceReloadKey, setForceReloadKey] = useState(Date.now())
   const [isCursorVisible, setIsCursorVisible] = useState(true)
+
+  useEffect(() => {
+    const wvA = webviewARef.current
+    if (wvA) {
+      const handleLoadA = () => { 
+        loadedUrlARef.current = urlA;
+        if (tabA && activeView === 0) applyWebviewSettings(wvA, tabA);
+      }
+      wvA.addEventListener('did-finish-load', handleLoadA)
+      return () => wvA.removeEventListener('did-finish-load', handleLoadA)
+    }
+  }, [urlA, tabA, activeView])
+
+  useEffect(() => {
+    const wvB = webviewBRef.current
+    if (wvB) {
+      const handleLoadB = () => { 
+        loadedUrlBRef.current = urlB;
+        if (tabB && activeView === 1) applyWebviewSettings(wvB, tabB);
+      }
+      wvB.addEventListener('did-finish-load', handleLoadB)
+      return () => wvB.removeEventListener('did-finish-load', handleLoadB)
+    }
+  }, [urlB, tabB, activeView])
 
   const onReadyCallbackRef = useRef<(() => void) | null>(null)
   const onFailCallbackRef = useRef<(() => void) | null>(null)
@@ -221,7 +278,7 @@ export default function PlayerScreen() {
 
       // Reset core player state for a fresh start
       setCountdownStarted(shouldSkip)
-      setCountdown(shouldSkip ? 0 : 10)
+      setCountdown(shouldSkip ? 0 : 5)
       setFirstTabLoaded(shouldSkip)
       setCurrentIndex(0)
       setActiveView(0)
@@ -251,6 +308,7 @@ export default function PlayerScreen() {
 
   // Report player-ready state when component mounts, or when monitorId / reload key changes
   useEffect(() => {
+    setCountdown(5)
     setCountdownStarted(false)
     if (selectedMonitorId) {
       console.log(`[PlayerScreen] Reporting player-ready for monitor ${selectedMonitorId}`)
@@ -311,7 +369,7 @@ export default function PlayerScreen() {
       return undefined
     }
 
-    setCountdown(10)
+    setCountdown(5)
 
     // Enter kiosk mode immediately when countdown begins
     window.electronAPI.invoke('toggle-kiosk', true).catch(err => {
@@ -516,52 +574,7 @@ export default function PlayerScreen() {
 
       if (wv) {
         const applyTabSettings = () => {
-          const zoomLevel = nextTab.zoom || 1;
-          wv.executeJavaScript(`document.documentElement.style.zoom = '${zoomLevel}';`).catch(console.error)
-
-          const disableScrollJS = `
-            window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
-            window.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-            
-            if (!window._variablCursorIdle) {
-              window._variablCursorIdle = true;
-              let cursorTimer = null;
-              const styleEl = document.createElement('style');
-              styleEl.innerHTML = '* { cursor: none !important; }';
-              let isHidden = false;
-
-              const hideCursor = () => {
-                if (!isHidden) {
-                  document.head.appendChild(styleEl);
-                  isHidden = true;
-                }
-              };
-
-              const showCursor = () => {
-                if (isHidden) {
-                  if (document.head.contains(styleEl)) document.head.removeChild(styleEl);
-                  isHidden = false;
-                }
-                clearTimeout(cursorTimer);
-                cursorTimer = setTimeout(hideCursor, 3000);
-              };
-
-              window.addEventListener('mousemove', showCursor);
-              window.addEventListener('mousedown', showCursor);
-              window.addEventListener('touchstart', showCursor);
-              window.addEventListener('keydown', showCursor);
-              cursorTimer = setTimeout(hideCursor, 3000);
-            }
-            
-            const style = document.createElement('style');
-            style.innerHTML = '::-webkit-scrollbar { display: none !important; }';
-            document.head.appendChild(style);
-          `
-          wv.executeJavaScript(disableScrollJS).catch(console.error)
-
-          if (nextTab.scroll?.enabled && nextTab.scroll?.position) {
-            wv.executeJavaScript(`window.scrollTo({ top: ${nextTab.scroll.position}, behavior: 'instant' })`)
-          }
+          applyWebviewSettings(wv, nextTab)
         }
 
         const onFinishLoad = () => {
