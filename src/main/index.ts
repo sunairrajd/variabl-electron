@@ -8,6 +8,13 @@ import { autoUpdater } from 'electron-updater'
 // Must be set before app.whenReady().
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
+let isQuitting = false
+export const getIsQuitting = () => isQuitting
+
+app.on('before-quit', () => {
+  isQuitting = true
+})
+
 app.setName('Variabl')
 
 export function loadDashboard(targetWin?: BrowserWindow, searchParams: string = '') {

@@ -228,6 +228,16 @@ function App(): React.JSX.Element {
 
             if (targetPlaylist) {
               console.log(`[RemoteControl] Found playlist ${playlistId}, starting playback.`)
+              
+              const currentMonitorId = state.selectedMonitorId
+              if (currentMonitorId) {
+                const storedStr = localStorage.getItem('monitorAssignments')
+                const assignments = storedStr ? JSON.parse(storedStr) : {}
+                assignments[currentMonitorId] = targetPlaylist
+                localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
+                state.setMonitorAssignments(assignments)
+              }
+              
               state.setSelectedPlaylist(targetPlaylist)
               state.navigate('player')
               return
@@ -304,47 +314,66 @@ function App(): React.JSX.Element {
 
             console.log(`[MultiListener] Detected remote assignment ${playlistId} for monitor ${monitor.id}`)
 
-            // Fetch playlist details
-            const baseUrl = 'https://tabrevolver.variabl.co'
-            const deviceToken = useAuthStore.getState().deviceToken
-            if (!deviceToken) return
+            let attempts = 0
+            const maxAttempts = 12
 
-            try {
-              const updatedPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, deviceToken)
-              const targetPlaylist = updatedPlaylists.find((p: any) => p.id === playlistId)
+            const tryFetchMulti = async () => {
+              const baseUrl = 'https://tabrevolver.variabl.co'
+              const deviceToken = useAuthStore.getState().deviceToken
+              if (!deviceToken) return
 
-              if (targetPlaylist) {
-                assignments[monitor.id] = targetPlaylist
-                localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
-                state.setMonitorAssignments(assignments)
+              try {
+                const updatedPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, deviceToken)
+                const targetPlaylist = updatedPlaylists.find((p: any) => p.id === playlistId)
 
-                // Safely spawn the window if it was closed, without destroying existing ones
-                if (monitor.isPrimary) {
-                  window.electronAPI.invoke('ensure-primary-window').catch(console.error)
-                } else {
-                  window.electronAPI.invoke('start-secondary-players', assignments).catch(console.error)
+                if (targetPlaylist) {
+                  assignments[monitor.id] = targetPlaylist
+                  localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
+                  state.setMonitorAssignments(assignments)
+
+                  if (monitor.isPrimary) {
+                    window.electronAPI.invoke('ensure-primary-window').catch(console.error)
+                  } else {
+                    window.electronAPI.invoke('start-secondary-players', assignments).catch(console.error)
+                  }
+                  return
                 }
-              }
-            } catch (err: any) {
-              if (err.message?.includes('401')) {
-                const newToken = await useAuthStore.getState().refreshAuthToken()
-                if (newToken) {
-                  const retryPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, newToken)
-                  const targetPlaylist = retryPlaylists.find((p: any) => p.id === playlistId)
-                  if (targetPlaylist) {
-                    assignments[monitor.id] = targetPlaylist
-                    localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
-                    state.setMonitorAssignments(assignments)
+              } catch (err: any) {
+                if (err.message?.includes('401')) {
+                  const newToken = await useAuthStore.getState().refreshAuthToken()
+                  if (newToken) {
+                    try {
+                      const retryPlaylists = await window.electronAPI.invoke('fetch-playlists', baseUrl, newToken)
+                      const targetPlaylist = retryPlaylists.find((p: any) => p.id === playlistId)
+                      if (targetPlaylist) {
+                        assignments[monitor.id] = targetPlaylist
+                        localStorage.setItem('monitorAssignments', JSON.stringify(assignments))
+                        state.setMonitorAssignments(assignments)
 
-                    if (monitor.isPrimary) {
-                      window.electronAPI.invoke('ensure-primary-window').catch(console.error)
-                    } else {
-                      window.electronAPI.invoke('start-secondary-players', assignments).catch(console.error)
+                        if (monitor.isPrimary) {
+                          window.electronAPI.invoke('ensure-primary-window').catch(console.error)
+                        } else {
+                          window.electronAPI.invoke('start-secondary-players', assignments).catch(console.error)
+                        }
+                        return
+                      }
+                    } catch (retryErr) {
+                      console.error('[MultiListener] Retry fetch failed', retryErr)
                     }
                   }
                 }
               }
+
+              attempts++
+              if (attempts < maxAttempts) {
+                console.log(`[MultiListener] Playlist ${playlistId} not found, retrying... (${attempts}/${maxAttempts})`)
+                setTimeout(tryFetchMulti, 5000)
+              } else {
+                console.warn(`[MultiListener] Could not find playlist ${playlistId} for monitor ${monitor.id} after 1 minute.`)
+              }
             }
+
+            tryFetchMulti()
           })
           unsubs.push(unsub)
         }

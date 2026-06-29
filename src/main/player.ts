@@ -67,10 +67,14 @@ export function startSecondaryPlayers(assignments: Record<number, any>) {
 
     win.on('closed', () => {
       secondaryWindows = secondaryWindows.filter((w) => w !== win)
-      // Send event to primary window
+      // Send event to primary window ONLY if we are not in the middle of app quit
       const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('monitorId='))
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('monitor-closed', monitorId)
+        import('./index').then(({ getIsQuitting }) => {
+          if (!getIsQuitting()) {
+            mainWindow.webContents.send('monitor-closed', monitorId)
+          }
+        })
       }
     })
 

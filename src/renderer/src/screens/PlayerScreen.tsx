@@ -439,7 +439,7 @@ export default function PlayerScreen() {
 
       const wv = activeView === 0 ? webviewARef.current : webviewBRef.current
       if (wv) {
-        wv.setZoomFactor(factor)
+        wv.executeJavaScript(`document.documentElement.style.zoom = '${factor}';`).catch(console.error)
         updatedTabs[currentIndex] = updatedTab
         const newPlaylist = { ...selectedPlaylist, tabs: updatedTabs }
         setSelectedPlaylist(newPlaylist)
@@ -516,8 +516,8 @@ export default function PlayerScreen() {
 
       if (wv) {
         const applyTabSettings = () => {
-          if (nextTab.zoom) wv.setZoomFactor(nextTab.zoom)
-          else wv.setZoomFactor(1)
+          const zoomLevel = nextTab.zoom || 1;
+          wv.executeJavaScript(`document.documentElement.style.zoom = '${zoomLevel}';`).catch(console.error)
 
           const disableScrollJS = `
             window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
