@@ -74,7 +74,33 @@ export default function PlayerScreen() {
   const displayId = useAuthStore((s) => s.displayId)
   const userId = useAuthStore((s) => s.firebaseUser?.uid)
   const selectedMonitorId = useAppStore((s) => s.selectedMonitorId)
-  const webviewARef = useRef<any>(null)
+  const [isScreenLandscape, setIsScreenLandscape] = useState(window.innerWidth > window.innerHeight)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsScreenLandscape(window.innerWidth > window.innerHeight)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const isPortraitPlaylist = selectedPlaylist?.orientation === 'portrait'
+  const shouldRotate = isPortraitPlaylist && isScreenLandscape
+
+  const rotateStyles: React.CSSProperties = shouldRotate ? {
+    width: '100vh',
+    height: '100vw',
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%) rotate(90deg)',
+    transformOrigin: 'center',
+  } : {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    inset: 0,
+  }
 
   useEffect(() => {
     if (!displayId || !selectedPlaylist?.id || !userId) return
@@ -142,6 +168,7 @@ export default function PlayerScreen() {
     return () => unsubscribe()
   }, [selectedPlaylist?.id, userId])
 
+  const webviewARef = useRef<any>(null)
   const webviewBRef = useRef<any>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const preloadTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -869,127 +896,171 @@ export default function PlayerScreen() {
     return acc + interval
   }, 0) || 0
 
+  const transitionType = selectedPlaylist?.transition?.type || 'fade'
+  const transitionDuration = selectedPlaylist?.transition?.duration ?? 1000
+
+  const getTransitionStyle = (viewIndex: number): React.CSSProperties => {
+    const isCurrent = activeView === viewIndex
+    const durationStr = `${transitionDuration}ms`
+
+    const baseStyle: React.CSSProperties = {
+      transitionProperty: transitionType === 'slide' ? 'transform' : 'opacity',
+      transitionDuration: durationStr,
+      transitionTimingFunction: 'ease-in-out',
+    }
+
+    if (transitionType === 'slide') {
+      return {
+        ...baseStyle,
+        transform: isCurrent 
+          ? 'translateX(0%)' 
+          : (viewIndex === 0 ? 'translateX(-100%)' : 'translateX(100%)'),
+        opacity: 1,
+        zIndex: isCurrent ? 10 : 0,
+        pointerEvents: isCurrent ? 'auto' : 'none',
+      }
+    } else {
+      return {
+        ...baseStyle,
+        opacity: isCurrent ? 1 : 0,
+        transform: 'none',
+        zIndex: isCurrent ? 10 : 0,
+        pointerEvents: isCurrent ? 'auto' : 'none',
+      }
+    }
+  }
+
   return (
     <div className={`relative w-screen h-screen bg-black overflow-hidden select-none ${!isCursorVisible ? 'cursor-none' : ''}`}>
-      <div className="absolute inset-0 h-full w-full">
-        {isWebsiteTab(tabA) && (
-          <webview
-            key={`wv-a-${forceReloadKey}`}
-            ref={(el) => { webviewARef.current = el }}
-            allowpopups={"true" as any}
-            src={urlA || undefined}
-            className={`absolute inset-0 h-full w-full bg-white transition-opacity duration-1000 ease-in-out ${activeView === 0 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
-          />
-        )}
-
-        <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 0 && !isWebsiteTab(tabA) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-          {!isWebsiteTab(tabA) && (
-            <RendererContainer
-              key={renderKeyA}
-              tab={tabA}
-              isActive={activeView === 0}
-              isPaused={isPaused || !firstTabLoaded}
-              onFinish={handleNext}
-              onReady={() => {
-                if (activeView !== 0) {
-                  backgroundTabReadyRef.current = true
-                  onReadyCallbackRef.current?.()
-                }
-              }}
-              onFail={() => {
-                if (activeView !== 0) {
-                  backgroundTabReadyRef.current = true
-                  onFailCallbackRef.current?.()
-                }
-              }}
+      <div style={rotateStyles}>
+        <div className="absolute inset-0 h-full w-full">
+          {isWebsiteTab(tabA) && (
+            <webview
+              key={`wv-a-${forceReloadKey}`}
+              ref={(el) => { webviewARef.current = el }}
+              allowpopups={"true" as any}
+              src={urlA || undefined}
+              className="absolute inset-0 h-full w-full bg-white"
+              style={getTransitionStyle(0)}
             />
           )}
-        </div>
 
-        {isWebsiteTab(tabB) && (
-          <webview
-            key={`wv-b-${forceReloadKey}`}
-            ref={(el) => { webviewBRef.current = el }}
-            allowpopups={"true" as any}
-            src={urlB || undefined}
-            className={`absolute inset-0 h-full w-full bg-white transition-opacity duration-1000 ease-in-out ${activeView === 1 ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
-          />
-        )}
+          <div 
+            className="absolute inset-0 h-full w-full"
+            style={getTransitionStyle(0)}
+          >
+            {!isWebsiteTab(tabA) && (
+              <RendererContainer
+                key={renderKeyA}
+                tab={tabA}
+                isActive={activeView === 0}
+                isPaused={isPaused || !firstTabLoaded}
+                onFinish={handleNext}
+                onReady={() => {
+                  if (activeView !== 0) {
+                    backgroundTabReadyRef.current = true
+                    onReadyCallbackRef.current?.()
+                  }
+                }}
+                onFail={() => {
+                  if (activeView !== 0) {
+                    backgroundTabReadyRef.current = true
+                    onFailCallbackRef.current?.()
+                  }
+                }}
+              />
+            )}
+          </div>
 
-        <div className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ease-in-out ${activeView === 1 && !isWebsiteTab(tabB) ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-          {!isWebsiteTab(tabB) && (
-            <RendererContainer
-              key={renderKeyB}
-              tab={tabB}
-              isActive={activeView === 1}
-              isPaused={isPaused || !firstTabLoaded}
-              onFinish={handleNext}
-              onReady={() => {
-                if (activeView !== 1) {
-                  backgroundTabReadyRef.current = true
-                  onReadyCallbackRef.current?.()
-                }
-              }}
-              onFail={() => {
-                if (activeView !== 1) {
-                  backgroundTabReadyRef.current = true
-                  onFailCallbackRef.current?.()
-                }
-              }}
+          {isWebsiteTab(tabB) && (
+            <webview
+              key={`wv-b-${forceReloadKey}`}
+              ref={(el) => { webviewBRef.current = el }}
+              allowpopups={"true" as any}
+              src={urlB || undefined}
+              className="absolute inset-0 h-full w-full bg-white"
+              style={getTransitionStyle(1)}
             />
           )}
-        </div>
-      </div>
 
-      <div
-        className={`absolute inset-0 flex flex-col items-center justify-center bg-black z-50 transition-opacity ease-in-out pointer-events-none ${firstTabLoaded ? 'opacity-0 duration-1000' : 'opacity-100 duration-0'
-          }`}
-      >
-        <GradientWaveText
-          className="text-xl font-medium mb-4 h-auto w-auto [--gradient-wave-base:rgb(255,255,255)]"
-          customColors={["#DAFA51", "#3b82f6", "#8b5cf6"]}
-          speed={1}
-          repeat={true}
+          <div 
+            className="absolute inset-0 h-full w-full"
+            style={getTransitionStyle(1)}
+          >
+            {!isWebsiteTab(tabB) && (
+              <RendererContainer
+                key={renderKeyB}
+                tab={tabB}
+                isActive={activeView === 1}
+                isPaused={isPaused || !firstTabLoaded}
+                onFinish={handleNext}
+                onReady={() => {
+                  if (activeView !== 1) {
+                    backgroundTabReadyRef.current = true
+                    onReadyCallbackRef.current?.()
+                  }
+                }}
+                onFail={() => {
+                  if (activeView !== 1) {
+                    backgroundTabReadyRef.current = true
+                    onFailCallbackRef.current?.()
+                  }
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        <div
+          className={`absolute inset-0 flex flex-col items-center justify-center bg-black z-50 transition-opacity ease-in-out pointer-events-none ${firstTabLoaded ? 'opacity-0 duration-1000' : 'opacity-100 duration-0'
+            }`}
         >
-          {selectedPlaylist ? (
-            <>
-              Activating display in <span className="text-lg font-mono">
-                00:{countdown.toString().padStart(2, '0')}
-              </span>
-            </>
-          ) : (
-            'Waiting for playlist...'
-          )}
-        </GradientWaveText>
-        <div className="flex items-center gap-2 text-white/50 text-[clamp(0.8rem,1vw,1rem)] font-light mt-2">
-          <Smartphone className="w-[1.2em] h-[1.2em]" />
-          <span>To control this screen remotely, visit <span className="text-white/80 font-medium">variabl.co/app</span></span>
+          <GradientWaveText
+            className="text-xl font-medium mb-4 h-auto w-auto [--gradient-wave-base:rgb(255,255,255)]"
+            customColors={["#DAFA51", "#3b82f6", "#8b5cf6"]}
+            speed={1}
+            repeat={true}
+          >
+            {selectedPlaylist ? (
+              <>
+                Activating display in <span className="text-lg font-mono">
+                  00:{countdown.toString().padStart(2, '0')}
+                </span>
+              </>
+            ) : (
+              'Waiting for playlist...'
+            )}
+          </GradientWaveText>
+          <div className="flex items-center gap-2 text-white/50 text-[clamp(0.8rem,1vw,1rem)] font-light mt-2">
+            <Smartphone className="w-[1.2em] h-[1.2em]" />
+            <span>To control this screen remotely, visit <span className="text-white/80 font-medium">variabl.co/app</span></span>
+          </div>
         </div>
-      </div>
 
-      {firstTabLoaded && (
-        <PlayerOverlayScreen
-          playlistName={selectedPlaylist?.name || 'My Playlist'}
-          tabs={selectedPlaylist?.tabs || []}
-          currentIndex={currentIndex}
-          currentTabName={selectedPlaylist?.tabs?.[currentIndex]?.title || selectedPlaylist?.tabs?.[currentIndex]?.url || ''}
-          isPaused={isPaused}
-          isNavigating={isRotating}
-          onPause={() => setIsPaused(true)}
-          onResume={() => setIsPaused(false)}
-          onNext={handleNext}
-          onPrev={handlePrev}
-          onExit={handleExit}
-          onScroll={handleScroll}
-          onSaveScroll={handleSaveScroll}
-          onZoom={handleZoom}
-          onSaveZoom={handleSaveZoom}
-          onFullscreenToggle={handleFullscreenToggle}
-          canScroll={canScroll}
-          canZoom={canZoom}
-          durationSeconds={totalDurationSeconds}
-        />
-      )}
+        {firstTabLoaded && (
+          <PlayerOverlayScreen
+            playlistName={selectedPlaylist?.name || 'My Playlist'}
+            tabs={selectedPlaylist?.tabs || []}
+            currentIndex={currentIndex}
+            currentTabName={selectedPlaylist?.tabs?.[currentIndex]?.title || selectedPlaylist?.tabs?.[currentIndex]?.url || ''}
+            isPaused={isPaused}
+            isNavigating={isRotating}
+            onPause={() => setIsPaused(true)}
+            onResume={() => setIsPaused(false)}
+            onNext={handleNext}
+            onPrev={handlePrev}
+            onExit={handleExit}
+            onScroll={handleScroll}
+            onSaveScroll={handleSaveScroll}
+            onZoom={handleZoom}
+            onSaveZoom={handleSaveZoom}
+            onFullscreenToggle={handleFullscreenToggle}
+            canScroll={canScroll}
+            canZoom={canZoom}
+            durationSeconds={totalDurationSeconds}
+          />
+        )}
+      </div>
     </div>
   )
 }

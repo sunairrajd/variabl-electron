@@ -31,6 +31,11 @@ export interface Playlist {
   defaultInterval: number
   rotationType?: string
   emoji?: string
+  orientation?: string
+  transition?: {
+    type: 'fade' | 'slide'
+    duration: number
+  }
 }
 
 interface AppState {
