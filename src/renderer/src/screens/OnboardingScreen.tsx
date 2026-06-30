@@ -6,6 +6,7 @@ import { useAppStore } from '@/stores/useAppStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { db, doc, getDoc } from '@/lib/firebase'
 import { ArrowLeft } from 'lucide-react'
+import { trackPageView } from '@/lib/analytics'
 
 import { AuroraBackground } from '@/components/ui/aurora-background'
 
@@ -17,10 +18,52 @@ export default function OnboardingScreen() {
       ? (localStorage.getItem('hasSeenIntro') === 'true' ? 'signin' : 'intro')
       : 'splash'
   })
+
+  // Track onboarding steps in Google Analytics
+  useEffect(() => {
+    trackPageView(`onboarding/${step}`, `Onboarding ${step.charAt(0).toUpperCase()}${step.slice(1)} Step`)
+  }, [step])
   const navigate = useAppStore((s) => s.navigate)
 
   const [postSplashAction, setPostSplashAction] = useState<(() => void) | null>(null)
   const [isOffline, setIsOffline] = useState(false)
+
+  // Arrow key navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        const active = document.activeElement;
+        if (active && active.tagName.toLowerCase() === 'input') {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            return; // Don't block editing text in inputs
+          }
+        }
+
+        const focusables = Array.from(
+          document.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]), [tabindex="0"]:not([disabled])'
+          )
+        ) as HTMLElement[];
+
+        if (focusables.length === 0) return;
+
+        e.preventDefault();
+        const currentIndex = focusables.indexOf(active as HTMLElement);
+        let nextIndex = 0;
+
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % focusables.length;
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          nextIndex = currentIndex === -1 ? focusables.length - 1 : (currentIndex - 1 + focusables.length) % focusables.length;
+        }
+
+        focusables[nextIndex].focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [])
 
   const checkNetworkAndProceed = async () => {
     setIsOffline(false)

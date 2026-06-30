@@ -9,3 +9,8 @@ declare module '*.png' {
 }
 
 declare module '@shadergradient/react';
+
+declare module '*?raw' {
+  const content: string
+  export default content
+}

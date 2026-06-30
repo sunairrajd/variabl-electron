@@ -15,13 +15,13 @@ export default function IntroStep({ onNext, onBack }: IntroStepProps) {
           <div className="h-[clamp(2.5rem,3.2vw,4.5rem)] w-[clamp(2.5rem,3.2vw,4.5rem)] opacity-0" />
           <div className="h-[clamp(2.5rem,3.2vw,4.5rem)]" />
         </div>
-        
+
         <div className="text-center max-w-[45vw] min-w-[320px] mt-[1vw]">
           <h1 className="text-[clamp(1.2rem,2vw,2.8rem)] font-light text-slate-700 mb-[1vw] tracking-[-1px] leading-[1.1]">
             Turn any screen into a live dashboard or digital signage display
           </h1>
           <p className="text-[clamp(0.75rem,0.9vw,1.2rem)] font-normal text-slate-400">
-            Display dashboards, videos, websites, and playlists in fullscreen mode
+            Display dashboards, videos, websites, and more in fullscreen mode
           </p>
         </div>
       </div>

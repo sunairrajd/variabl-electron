@@ -78,10 +78,25 @@ export async function syncDeviceAndScreens(monitors: MonitorInfo[], assignments:
       const screenId = getStoredScreenId(monitor.id.toString())
       const assignment = assignments[monitor.id]
 
+      // Check if we already have a stored screenName in localStorage
+      let existingScreenName = monitor.label
+      try {
+        const storedDevice = localStorage.getItem('variableDevice')
+        if (storedDevice) {
+          const parsed = JSON.parse(storedDevice)
+          const matchedScreen = parsed.screens?.find((s: any) => s.displayId === monitor.id.toString())
+          if (matchedScreen?.screenName) {
+            existingScreenName = matchedScreen.screenName
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse variableDevice for screenName fallback:', e)
+      }
+
       return {
         screenId,
         deviceId,
-        screenName: monitor.label,
+        screenName: existingScreenName,
         position: index + 1,
         displayId: monitor.id.toString(),
         width: monitor.bounds.width,

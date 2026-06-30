@@ -398,18 +398,36 @@ export default function PlayerScreen() {
   const setSelectedPlaylist = useAppStore((s) => s.setSelectedPlaylist)
 
   useEffect(() => {
-    if (countdown <= 0) return
-
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase()
-      if (key === 'escape' || key === 'q' || key === 'backspace') {
+      
+      // If still in countdown phase, only allow exit keys
+      if (countdown > 0) {
+        if (key === 'escape' || key === 'q' || key === 'backspace') {
+          handleExit()
+        }
+        return
+      }
+
+      // Playback phase controls
+      if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault()
+        setIsPaused((p) => !p)
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        handleNext()
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        handlePrev()
+      } else if (key === 'escape') {
+        e.preventDefault()
         handleExit()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [countdown])
+  }, [countdown, firstTabLoaded, currentIndex, isPaused, selectedPlaylist])
   const handleScroll = (deltaY: number) => {
     const wv = activeView === 0 ? webviewARef.current : webviewBRef.current
     if (wv) {
@@ -474,14 +492,12 @@ export default function PlayerScreen() {
       setTimeout(tryExecute, 5000)
     }
 
-    if (activeView === 0) {
-      toggleVideo(webviewARef.current, true)
-      toggleVideo(webviewBRef.current, false)
-    } else {
-      toggleVideo(webviewARef.current, false)
-      toggleVideo(webviewBRef.current, true)
-    }
-  }, [activeView])
+    const shouldPlayA = activeView === 0 && firstTabLoaded && !isPaused
+    const shouldPlayB = activeView === 1 && firstTabLoaded && !isPaused
+
+    toggleVideo(webviewARef.current, shouldPlayA)
+    toggleVideo(webviewBRef.current, shouldPlayB)
+  }, [activeView, firstTabLoaded, isPaused])
 
   const handleSaveScroll = () => {
     if (selectedPlaylist && selectedPlaylist.tabs) {

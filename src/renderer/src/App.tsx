@@ -7,6 +7,7 @@ import InactiveScreen from '@/screens/InactiveScreen'
 import PlayerOverlayScreen from '@/screens/PlayerOverlayScreen'
 import { db, doc, auth } from '@/lib/firebase'
 import { onSnapshot, updateDoc } from 'firebase/firestore'
+import { trackPageView } from '@/lib/analytics'
 
 const SCREENS = {
   player: PlayerScreen,
@@ -27,6 +28,11 @@ function App(): React.JSX.Element {
   const setUpdateReady = useAppStore((s) => s.setUpdateReady)
   const updateCountdown = useAppStore((s) => s.updateCountdown)
   const decrementUpdateCountdown = useAppStore((s) => s.decrementUpdateCountdown)
+
+  // Track global screen page views in Google Analytics
+  useEffect(() => {
+    trackPageView(currentView, `${currentView.charAt(0).toUpperCase()}${currentView.slice(1)} Screen`)
+  }, [currentView])
 
   // Auto-updater countdown logic
   useEffect(() => {
@@ -184,14 +190,35 @@ function App(): React.JSX.Element {
 
       const screenRef = doc(db, 'screens', screenId)
       unsubscribe = onSnapshot(screenRef, (snapshot) => {
+        if (!snapshot.exists()) return
+
+        const data = snapshot.data()
+
+        // Keep screenName updated in localStorage variableDevice
+        if (data?.screenName) {
+          try {
+            const stored = localStorage.getItem('variableDevice')
+            if (stored) {
+              const variableDevice = JSON.parse(stored)
+              if (variableDevice.screens) {
+                const screenIdx = variableDevice.screens.findIndex((s: any) => s.displayId === displayId)
+                if (screenIdx !== -1 && variableDevice.screens[screenIdx].screenName !== data.screenName) {
+                  variableDevice.screens[screenIdx].screenName = data.screenName
+                  localStorage.setItem('variableDevice', JSON.stringify(variableDevice))
+                  console.log('[App] Updated screenName in localStorage:', data.screenName)
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Failed to sync screenName to localStorage:', e)
+          }
+        }
+
         if (isInitialSnapshot) {
           isInitialSnapshot = false
           return
         }
 
-        if (!snapshot.exists()) return
-
-        const data = snapshot.data()
         const playlistId = data?.nowPlayingPlaylistId
 
         const state = useAppStore.getState()
@@ -417,19 +444,19 @@ function App(): React.JSX.Element {
 
       {/* Massive Universal Warning Overlay (last 6s) */}
       {isUpdateReady && updateCountdown <= 6 && (
-        <div className="fixed inset-0 z-[10000] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-500 backdrop-blur-md">
-          <div className="absolute top-12 text-slate-500 text-2xl font-mono tracking-widest">
+        <div className="fixed inset-0 z-[10000] bg-white/90 flex flex-col items-center justify-center animate-in fade-in duration-500 backdrop-blur-md">
+          <div className="absolute top-12 text-slate-500 text-xl font-mono tracking-widest">
             00:{updateCountdown.toString().padStart(2, '0')}
           </div>
-          <h1 className="text-5xl md:text-6xl text-white font-bold tracking-tight mb-4 text-center">
+          <h1 className="text-3xl md:text-4xl text-slate-900 font-bold tracking-tight mb-3 text-center">
             Applying Update
           </h1>
-          <p className="text-slate-400 text-lg md:text-xl text-center max-w-md">
-            Variabl is restarting to apply the latest version in <strong className="text-white">{updateCountdown}</strong> seconds
+          <p className="text-slate-600 text-sm md:text-base text-center max-w-sm px-6 leading-relaxed">
+            Variabl will install the update and restart. This may take a few minutes. Restarting in <strong className="text-slate-900 font-bold">{updateCountdown}</strong> seconds...
           </p>
           <button
             onClick={() => window.electronAPI.invoke('install-update')}
-            className="mt-8 bg-blue-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-blue-500 transition-colors shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+            className="mt-6 bg-slate-950 text-white hover:bg-slate-800 px-6 py-2.5 rounded-full text-sm font-semibold transition-all active:scale-95 shadow-sm"
           >
             Restart Now
           </button>

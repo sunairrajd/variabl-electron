@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { db, doc, setDoc } from '@/lib/firebase'
 import playlistsImage from '../../assets/playlists.png'
+import { trackEvent } from '@/lib/analytics'
 
 interface SignInStepProps {
   onNext: () => void
@@ -45,6 +46,8 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
 
           // Sign into Firebase Auth using the custom token endpoint
           await useAuthStore.getState().signInToFirebase(tokenToUse)
+
+          trackEvent('login_success', { method: url.startsWith('tabrevolver://') ? 'deep_link' : 'manual_paste' })
 
           // Try to register the screen in Firebase Realtime Database
           try {
@@ -135,6 +138,7 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
   const handleGoogleSignIn = () => {
     if (isGoogleSigningIn) return;
     setIsGoogleSigningIn(true);
+    trackEvent('click_google_sign_in')
 
     // Open variabl.co for the user login flow. 
     // The backend APIs will still be fetched from tabrevolver.variabl.co via IPC.
@@ -179,14 +183,14 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
         {!showManualInput ? (
           isGoogleSigningIn ? (
             <div className="flex flex-col items-center gap-2 mt-[1vw] animate-in fade-in zoom-in duration-300">
-              <p className="text-[clamp(1rem,1.1vw,1.3rem)] font-medium text-slate-700">
+              <p className="text-[clamp(0.85rem,1vw,1.1rem)] font-medium text-slate-700">
                 Go to the browser to complete login
               </p>
-              <p className="text-[clamp(0.8rem,0.9vw,1.1rem)] text-slate-400">
+              <p className="text-[clamp(0.7rem,0.8vw,0.95rem)] text-slate-400">
                 Not seeing the browser tab?{' '}
                 <button
                   onClick={() => setIsGoogleSigningIn(false)}
-                  className="text-slate-500 hover:text-slate-800 underline underline-offset-4 transition-colors font-medium cursor-pointer"
+                  className="text-slate-500 hover:text-slate-800 underline underline-offset-4 transition-colors font-medium cursor-pointer focus:ring-2 focus:ring-slate-400 focus:outline-none rounded px-1"
                 >
                   Go back and try again
                 </button>
@@ -239,7 +243,7 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
               </Button>
               <button
                 onClick={() => setShowManualInput(false)}
-                className="text-[clamp(0.7rem,0.8vw,1.1rem)] text-slate-400 hover:text-slate-600 px-[0.8vw]"
+                className="text-[clamp(0.7rem,0.8vw,1.1rem)] text-slate-400 hover:text-slate-600 px-[0.8vw] focus:ring-2 focus:ring-slate-400 focus:outline-none rounded"
               >
                 Cancel
               </button>

@@ -138,7 +138,7 @@ export default function PlayerOverlayScreen({
   }, [isVisible])
 
   useEffect(() => {
-    const handleMouseMove = () => {
+    const handleActivity = () => {
       if (Date.now() < ignoreMouseRef.current) return
 
       setIsVisible(true)
@@ -155,12 +155,70 @@ export default function PlayerOverlayScreen({
       }, 3000)
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mousemove', handleActivity)
+    window.addEventListener('keydown', handleActivity)
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mousemove', handleActivity)
+      window.removeEventListener('keydown', handleActivity)
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
     }
   }, [activeDropdown])
+
+  // Arrow key navigation & Escape handling
+  useEffect(() => {
+    if (!isVisible) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        const active = document.activeElement;
+        
+        // If a dropdown is active, restrict navigation inside it
+        const container = activeDropdown === 'scroll' || activeDropdown === 'zoom'
+          ? document.querySelector('.relative.flex .absolute.right-full') // the open dropdown container
+          : document.body;
+
+        if (!container) return;
+
+        const focusables = Array.from(
+          container.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]), [tabindex="0"]:not([disabled])'
+          )
+        ) as HTMLElement[];
+
+        if (focusables.length === 0) return;
+
+        e.preventDefault();
+        const currentIndex = focusables.indexOf(active as HTMLElement);
+        let nextIndex = 0;
+
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % focusables.length;
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          nextIndex = currentIndex === -1 ? focusables.length - 1 : (currentIndex - 1 + focusables.length) % focusables.length;
+        }
+
+        focusables[nextIndex].focus();
+      } else if (e.key === 'Escape') {
+        if (activeDropdown) {
+          e.preventDefault();
+          setActiveDropdown(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isVisible, activeDropdown]);
+
+  // Auto-focus dropdown buttons when dropdown opens
+  useEffect(() => {
+    if (activeDropdown) {
+      setTimeout(() => {
+        const firstBtn = document.querySelector('.relative.flex .absolute.right-full button') as HTMLElement;
+        if (firstBtn) firstBtn.focus();
+      }, 50);
+    }
+  }, [activeDropdown]);
 
   const displayUrl = currentTabName.replace(/^https?:\/\/(www\.)?/, '')
 
@@ -201,7 +259,7 @@ export default function PlayerOverlayScreen({
           <div className="w-px h-4 bg-white/30" />
 
           <div className="flex items-center gap-1.5">
-            <button onClick={onPrev} disabled={isNavigating} className="p-1 hover:bg-white/20 rounded-md transition disabled:opacity-50">
+            <button onClick={onPrev} disabled={isNavigating} className="p-1 hover:bg-white/20 rounded-md transition disabled:opacity-50 focus:ring-2 focus:ring-white focus:outline-none">
               <SkipBack className="h-3.5 w-3.5 fill-current" />
             </button>
             <button
@@ -219,19 +277,19 @@ export default function PlayerOverlayScreen({
                   callbacksRef.current.onPause()
                 }
               }}
-              className="flex items-center justify-center gap-1.5 bg-[#DAFA51] hover:bg-[#EEFFA6] text-[#0A600D] px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors w-[150px]"
+              className="flex items-center justify-center gap-1.5 bg-[#DAFA51] hover:bg-[#EEFFA6] text-[#0A600D] px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors w-[150px] focus:ring-2 focus:ring-[#DAFA51] focus:outline-none"
             >
               {isPaused ? <Play className="h-3.5 w-3.5 fill-current" /> : <Pause className="h-3.5 w-3.5 fill-current" />}
               <span>{isPaused ? 'Resume playing' : 'Pause'}</span>
             </button>
-            <button onClick={onNext} disabled={isNavigating} className="p-1 hover:bg-white/20 rounded-md transition disabled:opacity-50">
+            <button onClick={onNext} disabled={isNavigating} className="p-1 hover:bg-white/20 rounded-md transition disabled:opacity-50 focus:ring-2 focus:ring-white focus:outline-none">
               <SkipForward className="h-3.5 w-3.5 fill-current" />
             </button>
           </div>
         </div>
 
         {/* Top Right Close Button */}
-        <button onClick={onExit} className="absolute top-2 right-4 pointer-events-auto text-white hover:bg-white/20 p-2 rounded-full transition-colors z-50">
+        <button onClick={onExit} className="absolute top-2 right-4 pointer-events-auto text-white hover:bg-white/20 p-2 rounded-full transition-colors z-50 focus:ring-2 focus:ring-white focus:outline-none">
           <X className="h-7 w-7" strokeWidth={2.5} />
         </button>
 
@@ -244,7 +302,7 @@ export default function PlayerOverlayScreen({
               onClick={() => canScroll && setActiveDropdown(activeDropdown === 'scroll' ? null : 'scroll')}
               title="Scroll Position"
               disabled={!canScroll}
-              className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-sm transition ${!canScroll
+              className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-sm transition focus:ring-2 focus:ring-white focus:outline-none ${!canScroll
                 ? 'opacity-40 cursor-not-allowed bg-white/50'
                 : activeDropdown === 'scroll'
                   ? 'bg-gray-200 scale-105'
@@ -259,13 +317,13 @@ export default function PlayerOverlayScreen({
                 <div className="flex gap-2">
                   <button
                     onClick={() => onScroll(-200)}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 hover:bg-white text-black shadow-md transition hover:scale-105 active:scale-95"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 hover:bg-white text-black shadow-md transition hover:scale-105 active:scale-95 focus:ring-2 focus:ring-white focus:outline-none"
                   >
                     <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
                   </button>
                   <button
                     onClick={() => onScroll(200)}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 hover:bg-white text-black shadow-md transition hover:scale-105 active:scale-95"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 hover:bg-white text-black shadow-md transition hover:scale-105 active:scale-95 focus:ring-2 focus:ring-white focus:outline-none"
                   >
                     <ArrowDown className="h-5 w-5" strokeWidth={2.5} />
                   </button>
@@ -276,7 +334,7 @@ export default function PlayerOverlayScreen({
                     setActiveDropdown(null)
                     showToast("Scroll position saved!")
                   }}
-                  className="w-full mt-1 py-1.5 rounded-lg bg-[#2a2a2a] hover:bg-black text-white text-xs font-bold transition shadow-md"
+                  className="w-full mt-1 py-1.5 rounded-lg bg-[#2a2a2a] hover:bg-black text-white text-xs font-bold transition shadow-md focus:ring-2 focus:ring-white focus:outline-none"
                 >
                   Save Position
                 </button>
@@ -290,7 +348,7 @@ export default function PlayerOverlayScreen({
               onClick={() => canZoom && setActiveDropdown(activeDropdown === 'zoom' ? null : 'zoom')}
               title="Zoom Level"
               disabled={!canZoom}
-              className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-sm transition ${!canZoom
+              className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-sm transition focus:ring-2 focus:ring-white focus:outline-none ${!canZoom
                 ? 'opacity-40 cursor-not-allowed bg-white/50'
                 : activeDropdown === 'zoom'
                   ? 'bg-gray-200 scale-105'
@@ -302,13 +360,25 @@ export default function PlayerOverlayScreen({
 
             {activeDropdown === 'zoom' && canZoom && (
               <div className="absolute right-full top-1/2 -translate-y-1/2 mr-4 flex flex-col gap-1.5 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 p-2.5 shadow-xl w-32">
-                {[25, 50, 75, 100, 125, 150, 200].map((level) => (
+                {[
+                  { label: '25%', value: 0.25 },
+                  { label: '50%', value: 0.5 },
+                  { label: '75%', value: 0.75 },
+                  { label: '80%', value: 0.8 },
+                  { label: '90%', value: 0.9 },
+                  { label: '100%', value: 1.0 },
+                  { label: '110%', value: 1.1 },
+                  { label: '125%', value: 1.25 },
+                  { label: '150%', value: 1.5 },
+                  { label: '175%', value: 1.75 },
+                  { label: '200%', value: 2.0 }
+                ].map((opt) => (
                   <button
-                    key={level}
-                    onClick={() => onZoom(level / 100)}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/20 active:scale-95"
+                    key={opt.value}
+                    onClick={() => onZoom(opt.value)}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/20 active:scale-95 focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white"
                   >
-                    <span>{level}%</span>
+                    <span>{opt.label}</span>
                   </button>
                 ))}
                 <button
@@ -317,7 +387,7 @@ export default function PlayerOverlayScreen({
                     setActiveDropdown(null)
                     showToast("Zoom level saved!")
                   }}
-                  className="w-full mt-1 py-1.5 rounded-lg bg-[#2a2a2a] hover:bg-black text-white text-xs font-bold transition shadow-md"
+                  className="w-full mt-1 py-1.5 rounded-lg bg-[#2a2a2a] hover:bg-black text-white text-xs font-bold transition shadow-md focus:ring-2 focus:ring-white focus:outline-none"
                 >
                   Save Zoom
                 </button>
@@ -332,7 +402,7 @@ export default function PlayerOverlayScreen({
               onFullscreenToggle()
             }}
             title="Fullscreen"
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm transition hover:bg-gray-50 hover:scale-105 active:scale-95"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm transition hover:bg-gray-50 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-black focus:outline-none"
           >
             <Maximize className="h-5 w-5 text-black" strokeWidth={2.5} />
           </button>

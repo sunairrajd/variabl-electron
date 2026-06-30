@@ -10,7 +10,7 @@ interface SplashStepProps {
 export default function SplashStep({ onNext }: SplashStepProps) {
   const [mounted, setMounted] = useState(false)
   const [version, setVersion] = useState<string | null>(null)
-  
+
   const onNextRef = useRef(onNext)
   useEffect(() => {
     onNextRef.current = onNext
@@ -40,7 +40,7 @@ export default function SplashStep({ onNext }: SplashStepProps) {
   }, [])
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-white">
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[#9EF7FD]">
       <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-[2000ms] ease-in-out ${mounted ? 'opacity-100' : 'opacity-0'}`}>
         <ShaderGradientCanvas style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
           <ShaderGradient

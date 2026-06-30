@@ -4,6 +4,9 @@ import { useAppStore } from '@/stores/useAppStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { AuroraBackground } from '@/components/ui/aurora-background'
 import { X, Monitor, ExternalLink, MoreHorizontal, LogOut, RefreshCw } from 'lucide-react'
+import { db, doc, onSnapshot } from '@/lib/firebase'
+import { getStoredScreenId } from '@/services/DeviceSyncService'
+import { trackEvent } from '@/lib/analytics'
 
 export default function InactiveScreen() {
   const navigate = useAppStore((s) => s.navigate)
@@ -15,6 +18,8 @@ export default function InactiveScreen() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [deviceInfo, setDeviceInfo] = useState<any>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [firebaseScreenName, setFirebaseScreenName] = useState<string | null>(null)
+  const [showExitDialog, setShowExitDialog] = useState(false)
 
   useEffect(() => {
     try {
@@ -37,14 +42,111 @@ export default function InactiveScreen() {
     }
   }, [])
 
+  useEffect(() => {
+    const displayIdToUse = selectedMonitorId ? String(selectedMonitorId) : authDisplayId
+    if (!displayIdToUse) return
+
+    const screenId = getStoredScreenId(displayIdToUse)
+
+    const unsubscribe = onSnapshot(doc(db, 'screens', screenId), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data()
+        if (data?.screenName) {
+          setFirebaseScreenName(data.screenName)
+
+          // Also update local storage variableDevice so it persists
+          try {
+            const stored = localStorage.getItem('variableDevice')
+            if (stored) {
+              const variableDevice = JSON.parse(stored)
+              if (variableDevice.screens) {
+                const screenIdx = variableDevice.screens.findIndex((s: any) => s.displayId === displayIdToUse)
+                if (screenIdx !== -1) {
+                  variableDevice.screens[screenIdx].screenName = data.screenName
+                  localStorage.setItem('variableDevice', JSON.stringify(variableDevice))
+                  setDeviceInfo(variableDevice)
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Failed to update screenName in localStorage:', e)
+          }
+        }
+      }
+    })
+
+    return () => unsubscribe()
+  }, [authDisplayId, selectedMonitorId])
+
+  // Arrow key navigation & Escape handling
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        const active = document.activeElement;
+        
+        // If exit dialog is open, restrict focus navigation to the dialog container (focus trap)
+        const container = showExitDialog
+          ? document.querySelector('.bg-white.rounded-3xl')
+          : document.body;
+
+        if (!container) return;
+
+        const focusables = Array.from(
+          container.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]), [tabindex="0"]:not([disabled])'
+          )
+        ) as HTMLElement[];
+
+        if (focusables.length === 0) return;
+
+        e.preventDefault();
+        const currentIndex = focusables.indexOf(active as HTMLElement);
+        let nextIndex = 0;
+
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % focusables.length;
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          nextIndex = currentIndex === -1 ? focusables.length - 1 : (currentIndex - 1 + focusables.length) % focusables.length;
+        }
+
+        focusables[nextIndex].focus();
+      } else if (e.key === 'Escape') {
+        if (showExitDialog) {
+          setShowExitDialog(false);
+        } else if (isMenuOpen) {
+          setIsMenuOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showExitDialog, isMenuOpen]);
+
+  // Auto-focus dialog buttons when the Exit Dialog opens
+  useEffect(() => {
+    if (showExitDialog) {
+      setTimeout(() => {
+        const cancelButton = document.querySelector('.bg-white.rounded-3xl button') as HTMLElement;
+        if (cancelButton) cancelButton.focus();
+      }, 50);
+    }
+  }, [showExitDialog]);
+
   const currentScreen = deviceInfo?.screens?.find((s: any) => s.displayId === (selectedMonitorId ? String(selectedMonitorId) : authDisplayId))
-  const displayName = currentScreen?.monitorModel || currentScreen?.screenName || defaultScreenName || 'This screen'
+  const displayName = firebaseScreenName || currentScreen?.screenName || currentScreen?.monitorModel || defaultScreenName || 'This screen'
 
   const handleLogout = () => {
     window.electronAPI.invoke('logout-all').catch(console.error)
   }
 
   const handleExitDisplay = () => {
+    trackEvent('click_exit_display_attempt')
+    setShowExitDialog(true)
+  }
+
+  const confirmExitDisplay = () => {
+    trackEvent('confirm_exit_display')
     window.close()
   }
 
@@ -163,6 +265,36 @@ export default function InactiveScreen() {
         </div>
 
       </div>
+
+      {/* Exit Confirmation Dialog */}
+      {showExitDialog && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-[2vw] max-w-[400px] w-full mx-4 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-200 border border-slate-100">
+            <h4 className="text-[clamp(1rem,1.2vw,1.4rem)] font-medium text-slate-800 mb-[0.5vw]">Exit Player</h4>
+            <p className="text-slate-500/90 mb-[2vw] text-[clamp(0.8rem,0.9vw,1rem)] leading-relaxed max-w-[280px]">
+              Are you sure you want to close the player on this display?
+            </p>
+            <div className="flex w-full gap-[0.8vw]">
+              <Button
+                variant="ghost"
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-600 h-[clamp(2.5rem,3vw,3.5rem)] text-[clamp(0.8rem,0.9vw,1rem)] rounded-2xl transition-all duration-200"
+                onClick={() => {
+                  setShowExitDialog(false);
+                  trackEvent('cancel_exit_display');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white h-[clamp(2.5rem,3vw,3.5rem)] text-[clamp(0.8rem,0.9vw,1rem)] rounded-2xl transition-all duration-200"
+                onClick={confirmExitDisplay}
+              >
+                Exit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AuroraBackground>
   )
 }
