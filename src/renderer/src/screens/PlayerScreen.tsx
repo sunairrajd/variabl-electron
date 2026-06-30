@@ -186,7 +186,21 @@ export default function PlayerScreen() {
   const [tabB, setTabB] = useState<PlaylistTab | null>(null)
   const [renderKeyA, setRenderKeyA] = useState<number>(Date.now())
   const [renderKeyB, setRenderKeyB] = useState<number>(Date.now())
+  const [incomingView, setIncomingView] = useState<number | null>(null)
   const [isPaused, setIsPaused] = useState(false)
+
+  const transitionDuration = selectedPlaylist?.transition?.duration ?? 1000
+
+  const changeViewWithTransition = (nextView: number, nextIndex: number) => {
+    setIncomingView(nextView)
+    setActiveView(nextView)
+    setCurrentIndex(nextIndex)
+    setIsRotating(false)
+
+    setTimeout(() => {
+      setIncomingView(null)
+    }, transitionDuration + 50)
+  }
   const initialSkipState = useAppStore.getState().skipCountdown
   const [firstTabLoaded, setFirstTabLoaded] = useState(initialSkipState)
   const [countdown, setCountdown] = useState(initialSkipState ? 0 : 5)
@@ -309,6 +323,7 @@ export default function PlayerScreen() {
       setFirstTabLoaded(shouldSkip)
       setCurrentIndex(0)
       setActiveView(0)
+      setIncomingView(null)
       setIsRotating(false)
       setForceReloadKey(Date.now())
     }
@@ -593,6 +608,7 @@ export default function PlayerScreen() {
       return
     }
     const nextView = activeView === 0 ? 1 : 0
+    setIncomingView(nextView)
     const wv = nextView === 0 ? webviewARef.current : webviewBRef.current
 
     if (nextView === 0) {
@@ -636,9 +652,7 @@ export default function PlayerScreen() {
           applyTabSettings()
           setTimeout(() => {
             if (currentRotationIdRef.current !== rotationId) return
-            setActiveView(nextView)
-            setCurrentIndex(nextIndex)
-            setIsRotating(false)
+            changeViewWithTransition(nextView, nextIndex)
           }, 400)
         }
 
@@ -656,9 +670,7 @@ export default function PlayerScreen() {
           wv.removeEventListener('did-fail-load', onFailLoad)
 
           applyTabSettings()
-          setActiveView(nextView)
-          setCurrentIndex(nextIndex)
-          setIsRotating(false)
+          changeViewWithTransition(nextView, nextIndex)
         }
 
         wv.addEventListener('did-finish-load', onFinishLoad)
@@ -674,9 +686,7 @@ export default function PlayerScreen() {
           wv.removeEventListener('did-fail-load', onFailLoad)
 
           applyTabSettings()
-          setActiveView(nextView)
-          setCurrentIndex(nextIndex)
-          setIsRotating(false)
+          changeViewWithTransition(nextView, nextIndex)
         }, 3000)
 
         let isAlreadyLoaded = (nextView === 0 && loadedUrlARef.current === safeUrl) || (nextView === 1 && loadedUrlBRef.current === safeUrl)
@@ -703,9 +713,7 @@ export default function PlayerScreen() {
           applyTabSettings()
           setTimeout(() => {
             if (currentRotationIdRef.current !== rotationId) return
-            setActiveView(nextView)
-            setCurrentIndex(nextIndex)
-            setIsRotating(false)
+            changeViewWithTransition(nextView, nextIndex)
           }, 100)
           return
         }
@@ -719,11 +727,9 @@ export default function PlayerScreen() {
         */
 
       } else {
-        setActiveView(nextView)
-        setCurrentIndex(nextIndex)
+        changeViewWithTransition(nextView, nextIndex)
         if (nextView === 0) setUrlA(safeUrl)
         else setUrlB(safeUrl)
-        setIsRotating(false)
       }
     } else {
       // Internal Renderer
@@ -751,9 +757,7 @@ export default function PlayerScreen() {
         }
         setTimeout(() => {
           if (currentRotationIdRef.current !== rotationId) return
-          setActiveView(nextView)
-          setCurrentIndex(nextIndex)
-          setIsRotating(false)
+          changeViewWithTransition(nextView, nextIndex)
         }, 100)
       }
 
@@ -763,9 +767,7 @@ export default function PlayerScreen() {
           clearTimeout(rotationTimeoutRef.current)
           rotationTimeoutRef.current = null
         }
-        setActiveView(nextView)
-        setCurrentIndex(nextIndex)
-        setIsRotating(false)
+        changeViewWithTransition(nextView, nextIndex)
 
         setTimeout(() => {
           const skipIndex = (nextIndex + 1) % actualPlaylist.tabs.length
@@ -809,6 +811,8 @@ export default function PlayerScreen() {
       const nextIndex = (currentIndex + 1) % selectedPlaylist.tabs.length
       const nextTab = selectedPlaylist.tabs[nextIndex]
       const nextView = activeView === 0 ? 1 : 0
+
+      setIncomingView(nextView)
 
       if (isWebsiteTab(nextTab)) {
         backgroundTabReadyRef.current = false
@@ -897,11 +901,26 @@ export default function PlayerScreen() {
   }, 0) || 0
 
   const transitionType = selectedPlaylist?.transition?.type || 'fade'
-  const transitionDuration = selectedPlaylist?.transition?.duration ?? 1000
 
   const getTransitionStyle = (viewIndex: number): React.CSSProperties => {
     const isCurrent = activeView === viewIndex
-    const durationStr = `${transitionDuration}ms`
+    const isIncoming = incomingView === viewIndex
+
+    let translateX = '0%'
+    let duration = transitionDuration
+
+    if (transitionType === 'slide') {
+      if (isCurrent) {
+        translateX = '0%'
+      } else if (isIncoming) {
+        translateX = '100%'
+        duration = 0 // snap instantly to the right side of the screen
+      } else {
+        translateX = '-100%'
+      }
+    }
+
+    const durationStr = `${duration}ms`
 
     const baseStyle: React.CSSProperties = {
       transitionProperty: transitionType === 'slide' ? 'transform' : 'opacity',
@@ -912,9 +931,7 @@ export default function PlayerScreen() {
     if (transitionType === 'slide') {
       return {
         ...baseStyle,
-        transform: isCurrent 
-          ? 'translateX(0%)' 
-          : (viewIndex === 0 ? 'translateX(-100%)' : 'translateX(100%)'),
+        transform: `translateX(${translateX})`,
         opacity: 1,
         zIndex: isCurrent ? 10 : 0,
         pointerEvents: isCurrent ? 'auto' : 'none',
