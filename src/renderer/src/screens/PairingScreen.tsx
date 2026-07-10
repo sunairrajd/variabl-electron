@@ -44,6 +44,7 @@ function PairingScreen(): React.JSX.Element {
         </div>
         <p className="text-sm text-muted-foreground">Scan to pair this display</p>
 
+
         <div className="flex w-full items-center gap-3">
           <span className="h-px flex-1 bg-border" />
           <span className="text-xs uppercase tracking-wider text-muted-foreground">or</span>
