@@ -177,25 +177,37 @@ export default function PlayerScreen() {
     return () => unsubscribe()
   }, [selectedPlaylist?.id, userId])
 
-  const webviewRefs = useRef<Map<number, any>>(new Map())
+  const webviewARef = useRef<any>(null)
+  const webviewBRef = useRef<any>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const preloadTimerRef = useRef<NodeJS.Timeout | null>(null)
   const backgroundTabReadyRef = useRef(false)
+  
+  const loadedUrlARef = useRef<string>('')
+  const loadedUrlBRef = useRef<string>('')
 
+  const [activeView, setActiveView] = useState(0)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [incomingIndex, setIncomingIndex] = useState<number | null>(null)
-  const [loadedIndices, setLoadedIndices] = useState<Set<number>>(new Set())
+  const [urlA, setUrlA] = useState<string>('')
+  const [urlB, setUrlB] = useState<string>('')
+
+  const [tabA, setTabA] = useState<PlaylistTab | null>(null)
+  const [tabB, setTabB] = useState<PlaylistTab | null>(null)
+  const [renderKeyA, setRenderKeyA] = useState<number>(Date.now())
+  const [renderKeyB, setRenderKeyB] = useState<number>(Date.now())
+  const [incomingView, setIncomingView] = useState<number | null>(null)
   const [isPaused, setIsPaused] = useState(false)
 
   const transitionDuration = selectedPlaylist?.transition?.duration ?? 1000
 
-  const changeViewWithTransition = (nextIndex: number) => {
-    setIncomingIndex(nextIndex)
+  const changeViewWithTransition = (nextView: number, nextIndex: number) => {
+    setIncomingView(nextView)
+    setActiveView(nextView)
     setCurrentIndex(nextIndex)
     setIsRotating(false)
 
     setTimeout(() => {
-      setIncomingIndex(null)
+      setIncomingView(null)
     }, transitionDuration + 50)
   }
   const initialSkipState = useAppStore.getState().skipCountdown
@@ -204,7 +216,29 @@ export default function PlayerScreen() {
   const [forceReloadKey, setForceReloadKey] = useState(Date.now())
   const [isCursorVisible, setIsCursorVisible] = useState(true)
 
+  useEffect(() => {
+    const wvA = webviewARef.current
+    if (wvA) {
+      const handleLoadA = () => { 
+        loadedUrlARef.current = urlA;
+        if (tabA && activeView === 0) applyWebviewSettings(wvA, tabA);
+      }
+      wvA.addEventListener('did-finish-load', handleLoadA)
+      return () => wvA.removeEventListener('did-finish-load', handleLoadA)
+    }
+  }, [urlA, tabA, activeView])
 
+  useEffect(() => {
+    const wvB = webviewBRef.current
+    if (wvB) {
+      const handleLoadB = () => { 
+        loadedUrlBRef.current = urlB;
+        if (tabB && activeView === 1) applyWebviewSettings(wvB, tabB);
+      }
+      wvB.addEventListener('did-finish-load', handleLoadB)
+      return () => wvB.removeEventListener('did-finish-load', handleLoadB)
+    }
+  }, [urlB, tabB, activeView])
 
   const onReadyCallbackRef = useRef<(() => void) | null>(null)
   const onFailCallbackRef = useRef<(() => void) | null>(null)
@@ -302,9 +336,8 @@ export default function PlayerScreen() {
       setCountdown(shouldSkip ? 0 : 5)
       setFirstTabLoaded(shouldSkip)
       setCurrentIndex(0)
-      setIncomingIndex(null)
-      setLoadedIndices(new Set())
-      webviewRefs.current.clear()
+      setActiveView(0)
+      setIncomingView(null)
       setIsRotating(false)
       setForceReloadKey(Date.now())
     }
@@ -355,7 +388,29 @@ export default function PlayerScreen() {
       return undefined
     }
 
-    setLoadedIndices(new Set([0, selectedPlaylist.tabs.length > 1 ? 1 : 0]))
+    const initialTab = selectedPlaylist.tabs[0]
+    setTabA(initialTab)
+    setRenderKeyA(Date.now())
+
+    if (isWebsiteTab(initialTab)) {
+      const initialUrl = initialTab.url.startsWith('http')
+        ? initialTab.url
+        : `https://${initialTab.url}`
+      setUrlA(initialUrl)
+    }
+
+    // Preload the second tab if it exists
+    if (selectedPlaylist.tabs.length > 1) {
+      const secondTab = selectedPlaylist.tabs[1]
+      setTabB(secondTab)
+      setRenderKeyB(Date.now())
+      if (isWebsiteTab(secondTab)) {
+        const secondUrl = secondTab.url.startsWith('http')
+          ? secondTab.url
+          : `https://${secondTab.url}`
+        setUrlB(secondUrl)
+      }
+    }
 
     const shouldSkip = useAppStore.getState().skipCountdown
 
@@ -430,7 +485,7 @@ export default function PlayerScreen() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [countdown, firstTabLoaded, currentIndex, isPaused, selectedPlaylist])
   const handleScroll = (deltaY: number) => {
-    const wv = webviewRefs.current.get(currentIndex)
+    const wv = activeView === 0 ? webviewARef.current : webviewBRef.current
     if (wv) {
       wv.executeJavaScript(`window.scrollBy({ top: ${deltaY}, behavior: 'smooth' })`)
 
@@ -493,11 +548,12 @@ export default function PlayerScreen() {
       setTimeout(tryExecute, 5000)
     }
 
-    Array.from(webviewRefs.current.entries()).forEach(([index, wv]) => {
-      const shouldPlay = index === currentIndex && firstTabLoaded && !isPaused;
-      toggleVideo(wv, shouldPlay);
-    });
-  }, [currentIndex, firstTabLoaded, isPaused])
+    const shouldPlayA = activeView === 0 && firstTabLoaded && !isPaused
+    const shouldPlayB = activeView === 1 && firstTabLoaded && !isPaused
+
+    toggleVideo(webviewARef.current, shouldPlayA)
+    toggleVideo(webviewBRef.current, shouldPlayB)
+  }, [activeView, firstTabLoaded, isPaused])
 
   const handleSaveScroll = () => {
     if (selectedPlaylist && selectedPlaylist.tabs) {
@@ -511,7 +567,7 @@ export default function PlayerScreen() {
       const updatedTab = { ...currentTab, zoom: factor }
       const updatedTabs = [...selectedPlaylist.tabs]
 
-      const wv = webviewRefs.current.get(currentIndex)
+      const wv = activeView === 0 ? webviewARef.current : webviewBRef.current
       if (wv) {
         wv.executeJavaScript(`document.documentElement.style.zoom = '${factor}';`).catch(console.error)
         updatedTabs[currentIndex] = updatedTab
@@ -565,8 +621,17 @@ export default function PlayerScreen() {
       setIsRotating(false)
       return
     }
-    setIncomingIndex(nextIndex)
-    setLoadedIndices(prev => new Set(prev).add(nextIndex))
+    const nextView = activeView === 0 ? 1 : 0
+    setIncomingView(nextView)
+    const wv = nextView === 0 ? webviewARef.current : webviewBRef.current
+
+    if (nextView === 0) {
+      setTabA(nextTab)
+      setRenderKeyA(Date.now())
+    } else {
+      setTabB(nextTab)
+      setRenderKeyB(Date.now())
+    }
 
     // Clear the auto-rotation timer immediately
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -578,34 +643,121 @@ export default function PlayerScreen() {
     }
 
     if (isWebsiteTab(nextTab)) {
-      const wv = webviewRefs.current.get(nextIndex)
+      let safeUrl = nextTab.url.startsWith('http') ? nextTab.url : `https://${nextTab.url}`
 
       if (wv) {
-        if (nextTab.reloadOnRotate) {
-          try { wv.reload() } catch (e) {}
+        const applyTabSettings = () => {
+          applyWebviewSettings(wv, nextTab)
         }
-        applyWebviewSettings(wv, nextTab)
-        
-        setTimeout(() => {
-          if (currentRotationIdRef.current !== rotationId) return
-          changeViewWithTransition(nextIndex)
-        }, 100)
-      } else {
-        // If webview doesn't exist yet, it will mount now due to loadedIndices update.
-        // We will just transition to it after a short delay to allow it to render.
+
+        const onFinishLoad = () => {
+          if (currentRotationIdRef.current !== rotationId) {
+            wv.removeEventListener('did-finish-load', onFinishLoad)
+            wv.removeEventListener('did-fail-load', onFailLoad)
+            return
+          }
+          if (rotationTimeoutRef.current) {
+            clearTimeout(rotationTimeoutRef.current)
+            rotationTimeoutRef.current = null
+          }
+          wv.removeEventListener('did-finish-load', onFinishLoad)
+          wv.removeEventListener('did-fail-load', onFailLoad)
+
+          applyTabSettings()
+          setTimeout(() => {
+            if (currentRotationIdRef.current !== rotationId) return
+            changeViewWithTransition(nextView, nextIndex)
+          }, 400)
+        }
+
+        const onFailLoad = () => {
+          if (currentRotationIdRef.current !== rotationId) {
+            wv.removeEventListener('did-finish-load', onFinishLoad)
+            wv.removeEventListener('did-fail-load', onFailLoad)
+            return
+          }
+          if (rotationTimeoutRef.current) {
+            clearTimeout(rotationTimeoutRef.current)
+            rotationTimeoutRef.current = null
+          }
+          wv.removeEventListener('did-finish-load', onFinishLoad)
+          wv.removeEventListener('did-fail-load', onFailLoad)
+
+          applyTabSettings()
+          changeViewWithTransition(nextView, nextIndex)
+        }
+
+        wv.addEventListener('did-finish-load', onFinishLoad)
+        wv.addEventListener('did-fail-load', onFailLoad)
+
         rotationTimeoutRef.current = setTimeout(() => {
-          if (currentRotationIdRef.current !== rotationId) return
-          changeViewWithTransition(nextIndex)
-        }, 1000)
+          if (currentRotationIdRef.current !== rotationId) {
+            wv.removeEventListener('did-finish-load', onFinishLoad)
+            wv.removeEventListener('did-fail-load', onFailLoad)
+            return
+          }
+          wv.removeEventListener('did-finish-load', onFinishLoad)
+          wv.removeEventListener('did-fail-load', onFailLoad)
+
+          applyTabSettings()
+          changeViewWithTransition(nextView, nextIndex)
+        }, 3000)
+
+        let isAlreadyLoaded = (nextView === 0 && loadedUrlARef.current === safeUrl) || (nextView === 1 && loadedUrlBRef.current === safeUrl)
+
+        if (isAlreadyLoaded && nextTab.reloadOnRotate) {
+          isAlreadyLoaded = false
+          if (nextView === 0) loadedUrlARef.current = ''
+          else loadedUrlBRef.current = ''
+          
+          try {
+            if (nextView === 0 && webviewARef.current) webviewARef.current.reload()
+            else if (nextView === 1 && webviewBRef.current) webviewBRef.current.reload()
+          } catch (e) {
+            console.error('Failed to reload webview:', e)
+          }
+        }
+
+        if (!isAlreadyLoaded) {
+          if (nextView === 0) setUrlA(safeUrl)
+          else setUrlB(safeUrl)
+        }
+
+        if (isAlreadyLoaded) {
+          applyTabSettings()
+          setTimeout(() => {
+            if (currentRotationIdRef.current !== rotationId) return
+            changeViewWithTransition(nextView, nextIndex)
+          }, 100)
+          return
+        }
+
+        /*
+        try {
+          wv.loadURL(safeUrl)
+        } catch (e) {
+          console.error('Failed to load URL directly:', e)
+        }
+        */
+
+      } else {
+        changeViewWithTransition(nextView, nextIndex)
+        if (nextView === 0) setUrlA(safeUrl)
+        else setUrlB(safeUrl)
       }
     } else {
       // Internal Renderer
-      if (backgroundTabReadyRef.current) {
-        if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
+      const isAlreadyPreloaded = (nextView === 0 && tabA === nextTab) || (nextView === 1 && tabB === nextTab)
+
+      if (isAlreadyPreloaded && backgroundTabReadyRef.current) {
+        if (rotationTimeoutRef.current) {
+          clearTimeout(rotationTimeoutRef.current)
+          rotationTimeoutRef.current = null
+        }
         setTimeout(() => {
           if (currentRotationIdRef.current !== rotationId) return
+          setActiveView(nextView)
           setCurrentIndex(nextIndex)
-          setIncomingIndex(null)
           setIsRotating(false)
         }, 100)
         return
@@ -613,17 +765,24 @@ export default function PlayerScreen() {
 
       onReadyCallbackRef.current = () => {
         if (currentRotationIdRef.current !== rotationId) return
-        if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
+        if (rotationTimeoutRef.current) {
+          clearTimeout(rotationTimeoutRef.current)
+          rotationTimeoutRef.current = null
+        }
         setTimeout(() => {
           if (currentRotationIdRef.current !== rotationId) return
-          changeViewWithTransition(nextIndex)
+          changeViewWithTransition(nextView, nextIndex)
         }, 100)
       }
 
       onFailCallbackRef.current = () => {
         if (currentRotationIdRef.current !== rotationId) return
-        if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
-        changeViewWithTransition(nextIndex)
+        if (rotationTimeoutRef.current) {
+          clearTimeout(rotationTimeoutRef.current)
+          rotationTimeoutRef.current = null
+        }
+        changeViewWithTransition(nextView, nextIndex)
+
         setTimeout(() => {
           const skipIndex = (nextIndex + 1) % actualPlaylist.tabs.length
           triggerRotation(skipIndex, true)
@@ -665,33 +824,44 @@ export default function PlayerScreen() {
     preloadTimerRef.current = setTimeout(() => {
       const nextIndex = (currentIndex + 1) % selectedPlaylist.tabs.length
       const nextTab = selectedPlaylist.tabs[nextIndex]
+      const nextView = activeView === 0 ? 1 : 0
 
-      setIncomingIndex(nextIndex)
+      setIncomingView(nextView)
 
       if (isWebsiteTab(nextTab)) {
         backgroundTabReadyRef.current = false
-        const isAlreadyPreloaded = loadedIndices.has(nextIndex)
 
-        setLoadedIndices(prev => {
-          if (prev.has(nextIndex)) return prev;
-          return new Set(prev).add(nextIndex);
-        })
+        if (nextView === 0) {
+          setTabA(nextTab)
+          setRenderKeyA(Date.now())
+        } else {
+          setTabB(nextTab)
+          setRenderKeyB(Date.now())
+        }
+
+        let safeUrl = nextTab.url.startsWith('http') ? nextTab.url : `https://${nextTab.url}`
+        
+        let isAlreadyPreloaded = false
+        if (nextView === 0 && loadedUrlARef.current === safeUrl) isAlreadyPreloaded = true
+        if (nextView === 1 && loadedUrlBRef.current === safeUrl) isAlreadyPreloaded = true
 
         if (isAlreadyPreloaded && nextTab.reloadOnRotate) {
-          const wv = webviewRefs.current.get(nextIndex)
-          try { if (wv) wv.reload() } catch(e) {}
+          isAlreadyPreloaded = false
+          if (nextView === 0) loadedUrlARef.current = ''
+          else loadedUrlBRef.current = ''
+          
+          try {
+             if (nextView === 0 && webviewARef.current) webviewARef.current.reload()
+             else if (nextView === 1 && webviewBRef.current) webviewBRef.current.reload()
+          } catch(e) {}
         }
 
-        if (isAlreadyPreloaded) {
+        if (!isAlreadyPreloaded) {
+          if (nextView === 0) setUrlA(safeUrl)
+          else setUrlB(safeUrl)
+        } else {
           backgroundTabReadyRef.current = true
         }
-      } else {
-        const isAlreadyPreloaded = loadedIndices.has(nextIndex)
-        setLoadedIndices(prev => {
-          if (prev.has(nextIndex)) return prev;
-          return new Set(prev).add(nextIndex);
-        })
-        backgroundTabReadyRef.current = isAlreadyPreloaded
       }
     }, preloadMs)
 
@@ -704,7 +874,7 @@ export default function PlayerScreen() {
       if (timerRef.current) clearTimeout(timerRef.current)
       if (preloadTimerRef.current) clearTimeout(preloadTimerRef.current)
     }
-  }, [currentIndex, isPaused, selectedPlaylist, isRotating, firstTabLoaded, isCursorVisible])
+  }, [currentIndex, isPaused, activeView, selectedPlaylist, isRotating, firstTabLoaded, isCursorVisible])
 
   const handleNext = () => {
     if (!selectedPlaylist?.tabs) return
@@ -747,8 +917,8 @@ export default function PlayerScreen() {
   const transitionType = selectedPlaylist?.transition?.type || 'fade'
 
   const getTransitionStyle = (viewIndex: number): React.CSSProperties => {
-    const isCurrent = currentIndex === viewIndex
-    const isIncoming = incomingIndex === viewIndex
+    const isCurrent = activeView === viewIndex
+    const isIncoming = incomingView === viewIndex
 
     let translateX = '0%'
     let duration = transitionDuration
@@ -795,57 +965,81 @@ export default function PlayerScreen() {
     <div className={`relative w-screen h-screen bg-black overflow-hidden select-none ${!isCursorVisible ? 'cursor-none' : ''}`}>
       <div style={rotateStyles}>
         <div className="absolute inset-0 h-full w-full">
-          {selectedPlaylist?.tabs?.map((tab, index) => {
-            if (!loadedIndices.has(index)) return null;
+          {isWebsiteTab(tabA) && (
+            <webview
+              key={`wv-a-${forceReloadKey}`}
+              ref={(el) => { webviewARef.current = el }}
+              allowpopups={"true" as any}
+              src={urlA || undefined}
+              className="absolute inset-0 h-full w-full bg-white"
+              style={getTransitionStyle(0)}
+            />
+          )}
 
-            const isWebsite = isWebsiteTab(tab);
-            const safeUrl = tab.url?.startsWith('http') ? tab.url : `https://${tab.url}`;
+          <div 
+            className="absolute inset-0 h-full w-full"
+            style={getTransitionStyle(0)}
+          >
+            {!isWebsiteTab(tabA) && (
+              <RendererContainer
+                key={renderKeyA}
+                tab={tabA}
+                isActive={activeView === 0}
+                isPaused={isPaused || !firstTabLoaded}
+                onFinish={handleNext}
+                onReady={() => {
+                  if (activeView !== 0) {
+                    backgroundTabReadyRef.current = true
+                    onReadyCallbackRef.current?.()
+                  }
+                }}
+                onFail={() => {
+                  if (activeView !== 0) {
+                    backgroundTabReadyRef.current = true
+                    onFailCallbackRef.current?.()
+                  }
+                }}
+              />
+            )}
+          </div>
 
-            return (
-              <div 
-                key={`tab-${index}-${forceReloadKey}`}
-                className="absolute inset-0 h-full w-full"
-                style={getTransitionStyle(index)}
-              >
-                {isWebsite ? (
-                  <webview
-                    ref={(el) => { 
-                      if (el) {
-                        webviewRefs.current.set(index, el)
-                        if (index === currentIndex) applyWebviewSettings(el, tab)
-                        
-                        el.addEventListener('did-finish-load', () => {
-                           if (index === currentIndex) applyWebviewSettings(el, tab)
-                        })
-                      }
-                    }}
-                    allowpopups={"true" as any}
-                    src={safeUrl}
-                    className="absolute inset-0 h-full w-full bg-white"
-                  />
-                ) : (
-                  <RendererContainer
-                    tab={tab}
-                    isActive={currentIndex === index}
-                    isPaused={isPaused || !firstTabLoaded}
-                    onFinish={handleNext}
-                    onReady={() => {
-                      if (currentIndex !== index) {
-                        backgroundTabReadyRef.current = true
-                        onReadyCallbackRef.current?.()
-                      }
-                    }}
-                    onFail={() => {
-                      if (currentIndex !== index) {
-                        backgroundTabReadyRef.current = true
-                        onFailCallbackRef.current?.()
-                      }
-                    }}
-                  />
-                )}
-              </div>
-            );
-          })}
+          {isWebsiteTab(tabB) && (
+            <webview
+              key={`wv-b-${forceReloadKey}`}
+              ref={(el) => { webviewBRef.current = el }}
+              allowpopups={"true" as any}
+              src={urlB || undefined}
+              className="absolute inset-0 h-full w-full bg-white"
+              style={getTransitionStyle(1)}
+            />
+          )}
+
+          <div 
+            className="absolute inset-0 h-full w-full"
+            style={getTransitionStyle(1)}
+          >
+            {!isWebsiteTab(tabB) && (
+              <RendererContainer
+                key={renderKeyB}
+                tab={tabB}
+                isActive={activeView === 1}
+                isPaused={isPaused || !firstTabLoaded}
+                onFinish={handleNext}
+                onReady={() => {
+                  if (activeView !== 1) {
+                    backgroundTabReadyRef.current = true
+                    onReadyCallbackRef.current?.()
+                  }
+                }}
+                onFail={() => {
+                  if (activeView !== 1) {
+                    backgroundTabReadyRef.current = true
+                    onFailCallbackRef.current?.()
+                  }
+                }}
+              />
+            )}
+          </div>
         </div>
 
         <div

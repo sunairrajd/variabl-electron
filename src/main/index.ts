@@ -15,6 +15,33 @@ app.on('before-quit', () => {
   isQuitting = true
 })
 
+// Restart on uncaught exceptions in the main process
+process.on('uncaughtException', (error) => {
+  console.error('[Main] Uncaught Exception:', error)
+  if (!isQuitting) {
+    app.relaunch()
+    app.exit(1)
+  }
+})
+
+// Restart on render process crashes
+app.on('render-process-gone', (event, webContents, details) => {
+  console.error(`[Main] Render process gone. Reason: ${details.reason}`)
+  if (!isQuitting && (details.reason === 'crashed' || details.reason === 'oom')) {
+    app.relaunch()
+    app.exit(1)
+  }
+})
+
+// Restart on child process crashes
+app.on('child-process-gone', (event, details) => {
+  console.error(`[Main] Child process gone. Reason: ${details.reason}`)
+  if (!isQuitting && (details.reason === 'crashed' || details.reason === 'oom')) {
+    app.relaunch()
+    app.exit(1)
+  }
+})
+
 app.setName('Variabl')
 
 export function loadDashboard(targetWin?: BrowserWindow, searchParams: string = '') {

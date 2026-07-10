@@ -73,6 +73,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: () => {
     setLocalStorageItem('deviceToken', null)
     setLocalStorageItem('refreshToken', null)
+    setLocalStorageItem('monitorAssignments', null)
     if (auth) {
       auth.signOut().catch(console.error)
     }
@@ -110,20 +111,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       // 1. Exchange the ID token for a custom token via our backend endpoint
       const response = await window.electronAPI.invoke('fetch-custom-token', 'https://tabrevolver.variabl.co', idToken)
-      
+
       if (!response || !response.customToken) {
         throw new Error('No custom token returned')
       }
 
       // 2. Sign into Firebase using the custom token
       const userCredential = await signInWithCustomToken(auth, response.customToken)
-      
+
       // 3. Update the store with the Firebase user
-      set({ 
-        firebaseUser: { 
-          uid: userCredential.user.uid, 
-          email: userCredential.user.email 
-        } 
+      set({
+        firebaseUser: {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email
+        }
       })
       console.log('Successfully signed into Firebase Auth!')
     } catch (err) {

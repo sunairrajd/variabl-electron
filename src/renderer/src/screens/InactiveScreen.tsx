@@ -12,6 +12,7 @@ export default function InactiveScreen() {
   const navigate = useAppStore((s) => s.navigate)
   const isUpdateReady = useAppStore((s) => s.isUpdateReady)
   const logout = useAuthStore((s) => s.logout)
+  const userEmail = useAuthStore((s) => s.firebaseUser?.email)
   const defaultScreenName = useAuthStore((s) => s.screenName)
   const authDisplayId = useAuthStore((s) => s.displayId)
   const selectedMonitorId = useAppStore((s) => s.selectedMonitorId)
@@ -164,6 +165,13 @@ export default function InactiveScreen() {
             </button>
             {isMenuOpen && (
               <div className="absolute top-full right-0 mt-2 w-48 rounded-2xl bg-white/90 backdrop-blur-md border border-slate-200/50 p-2 shadow-2xl">
+                {userEmail && (
+                  <div className="px-4 py-2 mb-1 border-b border-slate-100">
+                    <p className="text-xs font-medium text-slate-500 truncate" title={userEmail}>
+                      {userEmail}
+                    </p>
+                  </div>
+                )}
                 {isUpdateReady && (
                   <button
                     onClick={() => {
