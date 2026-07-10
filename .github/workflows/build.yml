@@ -120,6 +120,26 @@ jobs:
         shell: pwsh
         run: Move-Item -Path "${{ env.INSTALLER_DIR }}/signed/*" -Destination "${{ env.INSTALLER_DIR }}" -Force
 
+      - name: Update latest.yml Hash and Size
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Recurse dist -Filter "*Setup*.exe" | Select-Object -First 1
+          $bytes = [System.IO.File]::ReadAllBytes($installer.FullName)
+          $hash = [Convert]::ToBase64String([System.Security.Cryptography.SHA512]::Create().ComputeHash($bytes))
+          $size = $bytes.Length
+          
+          $latestYmlPath = "dist/latest.yml"
+          $content = Get-Content $latestYmlPath
+          $content = $content -replace "(?m)^sha512: .*$", "sha512: $hash"
+          $content = $content -replace "(?m)^\s+sha512: .*$", "    sha512: $hash"
+          $content = $content -replace "(?m)^\s+size: .*$", "    size: $size"
+          Set-Content -Path $latestYmlPath -Value $content
+          
+          # Delete the blockmap since it corresponds to the unsigned exe
+          Remove-Item -Path "dist\*.blockmap" -ErrorAction SilentlyContinue
+          Write-Host "Updated latest.yml with new hash ($hash) and size ($size)."
+
       # ==========================================
       # PUBLISH TO GITHUB RELEASES
       # ==========================================
@@ -137,5 +157,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Upload Signed Setup EXE and auto-updater yml files
-          # Note: We don't upload win-unpacked, just the installer
-          gh release upload ${{ github.ref_name }} "dist/*Setup*.exe" dist/latest.yml dist/*.blockmap --clobber
+          # Note: We don't upload blockmap because signing breaks differential updates
+          gh release upload ${{ github.ref_name }} "dist/*Setup*.exe" dist/latest.yml --clobber
