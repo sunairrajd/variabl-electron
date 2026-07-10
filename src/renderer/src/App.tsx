@@ -214,12 +214,14 @@ function App(): React.JSX.Element {
           }
         }
 
+        const playlistId = data?.nowPlayingPlaylistId
+
         if (isInitialSnapshot) {
           isInitialSnapshot = false
-          return
+          if (!playlistId) {
+            return
+          }
         }
-
-        const playlistId = data?.nowPlayingPlaylistId
 
         const state = useAppStore.getState()
         const currentSelectedPlaylist = state.selectedPlaylist
