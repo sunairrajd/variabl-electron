@@ -255,11 +255,15 @@ app.whenReady().then(async () => {
 
   // Setup auto-updater in production
   if (!is.dev) {
+    // Set to true to see popup dialogs for updater events on Windows (set to false for production/customers)
+    const DEBUG_UPDATER = true;
+
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
 
     autoUpdater.on('update-downloaded', (info) => {
       console.log('[AutoUpdater] Update downloaded. Quitting and installing...', info.version)
+      if (DEBUG_UPDATER) import('electron').then(({ dialog }) => dialog.showMessageBox({ message: `Update downloaded: ${info.version}` }))
 
       // Notify all open windows that an update is ready
       BrowserWindow.getAllWindows().forEach(win => {
@@ -271,18 +275,22 @@ app.whenReady().then(async () => {
 
     autoUpdater.on('checking-for-update', () => {
       console.log('[AutoUpdater] Checking for updates...')
+      if (DEBUG_UPDATER) import('electron').then(({ dialog }) => dialog.showMessageBox({ message: "Checking for updates..." }))
     })
 
     autoUpdater.on('update-available', (info) => {
       console.log(`[AutoUpdater] Update available! New version: ${info.version}`)
+      if (DEBUG_UPDATER) import('electron').then(({ dialog }) => dialog.showMessageBox({ message: `Update available! New version: ${info.version}` }))
     })
 
     autoUpdater.on('update-not-available', () => {
       console.log(`[AutoUpdater] App is up to date. Current version: ${app.getVersion()}`)
+      if (DEBUG_UPDATER) import('electron').then(({ dialog }) => dialog.showMessageBox({ message: `App is up to date. Current version: ${app.getVersion()}` }))
     })
 
     autoUpdater.on('error', (err) => {
       console.error('[AutoUpdater] Error during update:', err)
+      if (DEBUG_UPDATER) import('electron').then(({ dialog }) => dialog.showMessageBox({ message: `Updater Error: ${err.message}` }))
     })
 
     // Check immediately on startup
