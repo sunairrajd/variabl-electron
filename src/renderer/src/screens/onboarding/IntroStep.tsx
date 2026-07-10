@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
+import socVideo from '@/assets/soc.mp4'
 
 interface IntroStepProps {
   onNext: () => void
@@ -28,9 +29,17 @@ export default function IntroStep({ onNext, onBack }: IntroStepProps) {
 
       {/* Centered Content (Only Video) */}
       <div className="flex flex-col items-center justify-center flex-1 my-[2vw]">
-        {/* Video placeholder */}
-        <div className="p-[1.2vw] rounded-[1.5vw] bg-white/80 h-auto border border-black/5">
-          <div className="w-[50vw] max-w-[1200px] min-w-[300px] aspect-[2/1] rounded-[1vw] bg-[#eef1e6] border border-black/5" />
+        {/* Video container */}
+        <div className="p-[1.2vw] rounded-[1.5vw] bg-white/80 h-auto border border-black/5 shadow-xl shadow-black/5 relative overflow-hidden">
+          <video 
+            src={socVideo} 
+            autoPlay 
+            muted 
+            loop 
+            playsInline
+            controls
+            className="w-[50vw] max-w-[1200px] min-w-[300px] h-auto rounded-[1vw] bg-[#eef1e6] border border-black/5" 
+          />
         </div>
       </div>
 
