@@ -84,7 +84,7 @@ export default function InactiveScreen() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         const active = document.activeElement;
-        
+
         // If exit dialog is open, restrict focus navigation to the dialog container (focus trap)
         const container = showExitDialog
           ? document.querySelector('.bg-white.rounded-3xl')
@@ -217,7 +217,7 @@ export default function InactiveScreen() {
               Nothing Playing
             </h1>
             <p className="text-[clamp(0.75rem,0.9vw,1.2rem)] font-normal text-slate-400">
-              This display is online and not playing any content.
+              This display is online and not playing any content
             </p>
           </div>
         </div>
