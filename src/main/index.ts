@@ -171,7 +171,7 @@ app.whenReady().then(async () => {
     contents.setWindowOpenHandler(({ url }) => {
       console.log('[Main] webview requested popup for URL:', url)
       const mainWindow = BrowserWindow.getAllWindows()[0]
-      
+
       let wasFullScreen = false
       if (mainWindow && mainWindow.isFullScreen()) {
         wasFullScreen = true
@@ -256,7 +256,7 @@ app.whenReady().then(async () => {
   // Setup auto-updater in production
   if (!is.dev) {
     // Set to true to see popup dialogs for updater events on Windows (set to false for production/customers)
-    const DEBUG_UPDATER = true;
+    const DEBUG_UPDATER = false;
 
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
