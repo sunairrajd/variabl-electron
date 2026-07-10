@@ -240,8 +240,10 @@ function App(): React.JSX.Element {
           return
         }
 
+        const freshCurrentView = state.currentView
+
         // If already playing this playlist, ignore
-        if (playlistId === currentSelectedPlaylist?.id && currentView === 'player') return
+        if (playlistId === currentSelectedPlaylist?.id && freshCurrentView === 'player') return
 
         let attempts = 0
         const maxAttempts = 4 // up to 1 minute (4 * 15s)

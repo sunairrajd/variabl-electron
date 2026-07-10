@@ -19,60 +19,64 @@ const isWebsiteTab = (tab: PlaylistTab | null) => {
 
 const applyWebviewSettings = (wv: any, tab: PlaylistTab) => {
   if (!wv || !tab) return;
-  const zoomLevel = tab.zoom || 1;
-  wv.executeJavaScript(`document.documentElement.style.zoom = '${zoomLevel}';`).catch(console.error)
+  try {
+    const zoomLevel = tab.zoom || 1;
+    wv.executeJavaScript(`document.documentElement.style.zoom = '${zoomLevel}';`).catch(() => {})
 
-  const disableScrollJS = `
-    window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
-    window.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-    
-    if (!window._variablCursorIdle) {
-      window._variablCursorIdle = true;
-      let cursorTimer = null;
-      const styleEl = document.createElement('style');
-      styleEl.innerHTML = '* { cursor: none !important; }';
-      let isHidden = false;
+    const disableScrollJS = `
+      window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+      window.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+      
+      if (!window._variablCursorIdle) {
+        window._variablCursorIdle = true;
+        let cursorTimer = null;
+        const styleEl = document.createElement('style');
+        styleEl.innerHTML = '* { cursor: none !important; }';
+        let isHidden = false;
 
-      const hideCursor = () => {
-        if (!isHidden) {
-          document.head.appendChild(styleEl);
-          isHidden = true;
-        }
-      };
+        const hideCursor = () => {
+          if (!isHidden) {
+            document.head.appendChild(styleEl);
+            isHidden = true;
+          }
+        };
 
-      const showCursor = () => {
-        if (isHidden) {
-          if (document.head.contains(styleEl)) document.head.removeChild(styleEl);
-          isHidden = false;
-        }
-        clearTimeout(cursorTimer);
+        const showCursor = () => {
+          if (isHidden) {
+            if (document.head.contains(styleEl)) document.head.removeChild(styleEl);
+            isHidden = false;
+          }
+          clearTimeout(cursorTimer);
+          cursorTimer = setTimeout(hideCursor, 3000);
+        };
+
+        let lastMove = 0;
+        const throttledShowCursor = (e) => {
+          const now = Date.now();
+          if (now - lastMove > 200) {
+            lastMove = now;
+            showCursor();
+          }
+        };
+
+        window.addEventListener('mousemove', throttledShowCursor);
+        window.addEventListener('mousedown', showCursor);
+        window.addEventListener('touchstart', showCursor);
+        window.addEventListener('keydown', showCursor);
         cursorTimer = setTimeout(hideCursor, 3000);
-      };
+      }
+      
+      const style = document.createElement('style');
+      style.innerHTML = '::-webkit-scrollbar { display: none !important; }';
+      document.head.appendChild(style);
+    `
+    wv.executeJavaScript(disableScrollJS).catch(() => {})
 
-      let lastMove = 0;
-      const throttledShowCursor = (e) => {
-        const now = Date.now();
-        if (now - lastMove > 200) {
-          lastMove = now;
-          showCursor();
-        }
-      };
-
-      window.addEventListener('mousemove', throttledShowCursor);
-      window.addEventListener('mousedown', showCursor);
-      window.addEventListener('touchstart', showCursor);
-      window.addEventListener('keydown', showCursor);
-      cursorTimer = setTimeout(hideCursor, 3000);
+    if (tab.scroll?.enabled && tab.scroll?.position) {
+      wv.executeJavaScript(`window.scrollTo({ top: ${tab.scroll.position}, behavior: 'instant' })`).catch(() => {})
     }
-    
-    const style = document.createElement('style');
-    style.innerHTML = '::-webkit-scrollbar { display: none !important; }';
-    document.head.appendChild(style);
-  `
-  wv.executeJavaScript(disableScrollJS).catch(console.error)
-
-  if (tab.scroll?.enabled && tab.scroll?.position) {
-    wv.executeJavaScript(`window.scrollTo({ top: ${tab.scroll.position}, behavior: 'instant' })`).catch(console.error)
+  } catch (err) {
+    // Suppress synchronous errors caused by calling executeJavaScript before dom-ready
   }
 }
 
@@ -327,7 +331,7 @@ export default function PlayerScreen() {
       cleanup()
       clearTimeout(fallbackTimer)
     }
-  }, [])
+  }, [forceReloadKey])
 
   // Report player-ready state when component mounts, or when monitorId / reload key changes
   useEffect(() => {

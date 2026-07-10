@@ -54,52 +54,53 @@
   --animate-screen-enter: screen-enter 2000ms var(--ease-emil-out) forwards;
   --animate-cta-enter: cta-enter 800ms var(--ease-emil-out) 300ms both;
 
-  @keyframes screen-enter {
-    from {
-      opacity: 0;
-      transform: translateY(12px) scale(0.98);
-    }
+}
 
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
   }
 
-  @keyframes cta-enter {
-    from {
-      opacity: 0;
-      transform: translateY(24px) scale(0.95);
-      filter: blur(4px);
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-      filter: blur(0px);
-    }
+@keyframes cta-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.95);
+    filter: blur(4px);
   }
 
-  @keyframes reveal {
-    from {
-      opacity: 0;
-      transform: translateY(12px) scale(0.95);
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
 
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
   }
 
-  @keyframes aurora {
-    from {
-      background-position: 50% 50%, 50% 50%;
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 
-    to {
-      background-position: 350% 50%, 350% 50%;
-    }
+@keyframes aurora {
+  from {
+    background-position: 50% 50%, 50% 50%;
+  }
+
+  to {
+    background-position: 350% 50%, 350% 50%;
   }
 }
 

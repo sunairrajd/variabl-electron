@@ -25,7 +25,7 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
   ipcMain.handle('open-external', (_, url: string) => {
     import('electron').then(({ shell }) => shell.openExternal(url))
   })
-  
+
   ipcMain.handle('stop-player', () => {
     stopPlayer()
   })
@@ -108,7 +108,7 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
       },
       body: JSON.stringify({ tabs })
     })
-    
+
     if (!response.ok) {
       throw new Error(`Failed to sync playlist: ${response.status} ${response.statusText}`)
     }
@@ -126,7 +126,7 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
       },
       body: JSON.stringify({ devicePayload, screensData })
     })
-    
+
     if (!response.ok) {
       const text = await response.text()
       throw new Error(`Failed to sync device and screens: ${response.status} ${response.statusText} - ${text}`)
@@ -144,7 +144,7 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
         'Authorization': `Bearer ${token}`
       }
     })
-    
+
     if (!response.ok) {
       const text = await response.text()
       throw new Error(`Failed to fetch custom token: ${response.status} ${response.statusText} - ${text}`)
