@@ -1,6 +1,9 @@
 {
   "name": "variabl-player",
-  "version": "1.4.9",
+  "version": "1.5.0",
+  "author": {
+    "name": "Boredom Technologies LLP"
+  },
   "description": "Variabl Player — Digital Signage App",
   "main": "./out/main/index.js",
   "scripts": {
