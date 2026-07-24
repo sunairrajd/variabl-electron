@@ -1,6 +1,6 @@
 {
   "name": "variabl-player",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "author": {
     "name": "Boredom Technologies LLP"
   },
@@ -70,7 +70,7 @@
         "repo": "variabl-electron"
       }
     ],
-    "productName": "Variabl",
+    "productName": "Variabl Player - Digital signage for dashboards",
     "directories": {
       "output": "dist"
     },
@@ -94,13 +94,15 @@
         "nsis"
       ],
       "icon": "resources/icon.ico",
-      "artifactName": "Variabl-Setup-${version}.${ext}"
+      "artifactName": "Variabl-Setup-${version}.${ext}",
+      "publisherName": "Boredom Technologies LLP"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "uninstallDisplayName": "Variabl Player - Digital signage for dashboards"
     }
   }
 }
