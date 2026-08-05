@@ -17,6 +17,19 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
   const [showManualInput, setShowManualInput] = useState(false)
   const [manualToken, setManualToken] = useState('')
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false)
+  const [showRetryLogin, setShowRetryLogin] = useState(false)
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    if (isGoogleSigningIn) {
+      timer = setTimeout(() => {
+        setShowRetryLogin(true)
+      }, 5000)
+    } else {
+      setShowRetryLogin(false)
+    }
+    return () => clearTimeout(timer)
+  }, [isGoogleSigningIn])
 
   const handleUrl = async (url: unknown) => {
     if (typeof url === 'string') {
@@ -186,15 +199,17 @@ export default function SignInStep({ onNext, onBack }: SignInStepProps) {
               <p className="text-[clamp(0.85rem,1vw,1.1rem)] font-medium text-slate-700">
                 Go to the browser to complete login
               </p>
-              <p className="text-[clamp(0.7rem,0.8vw,0.95rem)] text-slate-400">
-                Not seeing the browser tab?{' '}
-                <button
-                  onClick={() => setIsGoogleSigningIn(false)}
-                  className="text-slate-500 hover:text-slate-800 underline underline-offset-4 transition-colors font-medium cursor-pointer focus:ring-2 focus:ring-slate-400 focus:outline-none rounded px-1"
-                >
-                  Go back and try again
-                </button>
-              </p>
+              {showRetryLogin && (
+                <p className="text-[clamp(0.7rem,0.8vw,0.95rem)] text-slate-400 animate-in fade-in duration-300">
+                  Not seeing the browser tab?{' '}
+                  <button
+                    onClick={() => setIsGoogleSigningIn(false)}
+                    className="text-slate-500 hover:text-slate-800 underline underline-offset-4 transition-colors font-medium cursor-pointer focus:ring-2 focus:ring-slate-400 focus:outline-none rounded px-1"
+                  >
+                    Go back and try again
+                  </button>
+                </p>
+              )}
             </div>
           ) : (
             <Button
