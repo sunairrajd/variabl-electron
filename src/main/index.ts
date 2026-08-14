@@ -7,6 +7,8 @@ import { autoUpdater } from 'electron-updater'
 // Allow autoplay without user gesture — required for digital signage / kiosk mode.
 // Must be set before app.whenReady().
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+app.commandLine.appendSwitch('disable-features', 'IsolateOrigins,site-per-process')
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 
 let isQuitting = false
 export const getIsQuitting = () => isQuitting
@@ -153,8 +155,11 @@ app.whenReady().then(async () => {
   // Spoof User Agent to disguise Electron environment
   const currentUserAgent = session.defaultSession.getUserAgent()
   const cleanUserAgent = currentUserAgent
-    .replace(/Electron\/[a-zA-Z0-9.-]+ /, '')
-    .replace(/variabl electron app\/[a-zA-Z0-9.-]+ /, '')
+    .replace(new RegExp(`Electron\\/([a-zA-Z0-9.-]+) `), '')
+    .replace(new RegExp(`${app.name}\\/([a-zA-Z0-9.-]+) `), '')
+    .replace(new RegExp(`variabl-player\\/([a-zA-Z0-9.-]+) `), '')
+  
+  app.userAgentFallback = cleanUserAgent
   session.defaultSession.setUserAgent(cleanUserAgent)
 
   // Set macOS dock icon in development/runtime
