@@ -18,8 +18,8 @@ const pendingBatch: PendingActivityBatch = {
 }
 
 let flushTimer: NodeJS.Timeout | null = null
-const FLUSH_INTERVAL_MS = 2 * 60 * 1000 // Buffer rotations and send at most once every 2 minutes
-const MAX_BATCH_SIZE = 10 // Or send immediately if 10 rotations accumulate
+const FLUSH_INTERVAL_MS = 5 * 60 * 1000 // Buffer rotations and send at most once every 5 minutes
+const MAX_BATCH_SIZE = 50 // Or send immediately if 50 rotations accumulate
 
 /**
  * Buffers a completed playlist rotation in memory.
