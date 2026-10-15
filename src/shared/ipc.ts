@@ -61,6 +61,7 @@ export interface IpcInvokeContract {
     ]
     result: any
   }
+  'minimize-window': { args: []; result: void }
 }
 
 export type InvokeChannel = keyof IpcInvokeContract
@@ -97,7 +98,8 @@ export const INVOKE_CHANNELS = [
   'player-ready',
   'ensure-primary-window',
   'logout-all',
-  'track-rotation'
+  'track-rotation',
+  'minimize-window'
 ] as const satisfies readonly InvokeChannel[]
 
 /** Fire-and-forget renderer→main channels — populated in later tasks. */

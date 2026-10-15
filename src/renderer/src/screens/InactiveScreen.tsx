@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/stores/useAppStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { AuroraBackground } from '@/components/ui/aurora-background'
-import { X, Monitor, ExternalLink, MoreHorizontal, LogOut, RefreshCw } from 'lucide-react'
+import { X, Monitor, ExternalLink, MoreHorizontal, LogOut, RefreshCw, Minus, MessageCircle } from 'lucide-react'
 import { db, doc, onSnapshot } from '@/lib/firebase'
 import { getStoredScreenId } from '@/services/DeviceSyncService'
 import { trackEvent } from '@/lib/analytics'
@@ -198,6 +198,13 @@ export default function InactiveScreen() {
             )}
           </div>
           <button
+            onClick={() => window.electronAPI.invoke('minimize-window').catch(console.error)}
+            className="text-slate-400 hover:text-slate-600 hover:bg-black/5 p-2 rounded-full transition-colors flex items-center justify-center cursor-pointer"
+            title="Minimize"
+          >
+            <Minus className="h-7 w-7" strokeWidth={2.5} />
+          </button>
+          <button
             onClick={handleExitDisplay}
             className="text-slate-400 hover:text-slate-600 hover:bg-black/5 p-2 rounded-full transition-colors flex items-center justify-center"
           >
@@ -250,6 +257,16 @@ export default function InactiveScreen() {
               </div>
             )}
           </div>
+
+          {/* Need Help / Support Chat Button */}
+          <button
+            onClick={() => window.electronAPI.invoke('open-external', 'https://tawk.to/chat/69d0a686b8aa781c3b310073/1jlbgkvok')}
+            className="mt-[1.5vw] inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 hover:bg-white text-slate-600 hover:text-slate-900 border border-white/90 hover:border-slate-200/80 shadow-xs hover:shadow-sm text-[clamp(0.75rem,0.85vw,0.95rem)] font-medium transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.98] cursor-pointer group"
+          >
+            <MessageCircle className="w-[1vw] h-[1vw] min-w-[15px] min-h-[15px] text-emerald-600 group-hover:scale-110 transition-transform duration-200" strokeWidth={2} />
+            <span>Need help? Chat with our team</span>
+            <ExternalLink className="w-[0.85vw] h-[0.85vw] min-w-[13px] min-h-[13px] text-slate-400 group-hover:text-slate-600 transition-colors" strokeWidth={1.8} />
+          </button>
         </div>
 
         {/* Pinned Footer */}

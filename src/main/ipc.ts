@@ -77,6 +77,24 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
     })
   })
 
+  ipcMain.handle('minimize-window', (event) => {
+    import('electron').then(({ BrowserWindow }) => {
+      const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getAllWindows()[0]
+      if (win) {
+        if (win.isKiosk()) {
+          win.setKiosk(false)
+        }
+        if (win.isFullScreen()) {
+          win.setFullScreen(false)
+        } else if (win.isMaximized()) {
+          win.unmaximize()
+        } else {
+          win.minimize()
+        }
+      }
+    })
+  })
+
   ipcMain.handle('store-get', () => {
     // Stub to prevent frontend errors
     return null
