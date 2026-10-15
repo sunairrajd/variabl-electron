@@ -46,6 +46,20 @@ export interface IpcInvokeContract {
   'player-ready': { args: [monitorId: number]; result: void }
   'ensure-primary-window': { args: []; result: void }
   'logout-all': { args: []; result: void }
+  'track-rotation': {
+    args: [
+      baseUrl: string,
+      token: string,
+      eventData: {
+        screenId: string | null
+        playlistId: string | null
+        eventId: string
+        timestamp: number
+        date: string
+      }
+    ]
+    result: any
+  }
 }
 
 export type InvokeChannel = keyof IpcInvokeContract
@@ -81,7 +95,8 @@ export const INVOKE_CHANNELS = [
   'close-secondary-players',
   'player-ready',
   'ensure-primary-window',
-  'logout-all'
+  'logout-all',
+  'track-rotation'
 ] as const satisfies readonly InvokeChannel[]
 
 /** Fire-and-forget renderer→main channels — populated in later tasks. */

@@ -7,6 +7,7 @@ import RendererContainer from '@/components/renderers/RendererContainer'
 import { db, doc, updateDoc, onSnapshot } from '@/lib/firebase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { GradientWaveText } from '@/components/ui/gradient-wave-text'
+import { recordPlaylistRotation } from '@/services/ActivityService'
 
 const isWebsiteTab = (tab: PlaylistTab | null) => {
   if (!tab) return true;
@@ -193,10 +194,28 @@ export default function PlayerScreen() {
 
   const transitionDuration = selectedPlaylist?.transition?.duration ?? 1000
 
-  const changeViewWithTransition = (nextIndex: number) => {
+  const playedTabsInLoopRef = useRef<Set<number>>(new Set())
+
+  const checkRotationCompletionOnTransition = (nextIndex: number, playlist: Playlist | null | undefined) => {
+    if (!playlist?.tabs || playlist.tabs.length === 0) return
+
+    // Full loop completed when transitioning back to index 0 after all tabs completed playback
+    if (nextIndex === 0 && playedTabsInLoopRef.current.size >= playlist.tabs.length) {
+      console.log('[PlayerScreen] Full playlist rotation completed successfully!')
+      recordPlaylistRotation(playlist.id, displayId)
+      playedTabsInLoopRef.current.clear()
+    }
+  }
+
+  const changeViewWithTransition = (nextIndex: number, playlistOverride?: Playlist | null) => {
     setIncomingIndex(nextIndex)
     setCurrentIndex(nextIndex)
     setIsRotating(false)
+
+    const playlistToCheck = playlistOverride || selectedPlaylist
+    if (playlistToCheck) {
+      checkRotationCompletionOnTransition(nextIndex, playlistToCheck)
+    }
 
     setTimeout(() => {
       setIncomingIndex(null)
@@ -309,6 +328,7 @@ export default function PlayerScreen() {
       setIncomingIndex(null)
       setLoadedIndices(new Set())
       webviewRefs.current.clear()
+      playedTabsInLoopRef.current.clear()
       setIsRotating(false)
       setForceReloadKey(Date.now())
     }
@@ -592,14 +612,14 @@ export default function PlayerScreen() {
         
         setTimeout(() => {
           if (currentRotationIdRef.current !== rotationId) return
-          changeViewWithTransition(nextIndex)
+          changeViewWithTransition(nextIndex, actualPlaylist)
         }, 100)
       } else {
         // If webview doesn't exist yet, it will mount now due to loadedIndices update.
         // We will just transition to it after a short delay to allow it to render.
         rotationTimeoutRef.current = setTimeout(() => {
           if (currentRotationIdRef.current !== rotationId) return
-          changeViewWithTransition(nextIndex)
+          changeViewWithTransition(nextIndex, actualPlaylist)
         }, 1000)
       }
     } else {
@@ -611,6 +631,7 @@ export default function PlayerScreen() {
           setCurrentIndex(nextIndex)
           setIncomingIndex(null)
           setIsRotating(false)
+          checkRotationCompletionOnTransition(nextIndex, actualPlaylist)
         }, 100)
         return
       }
@@ -620,14 +641,14 @@ export default function PlayerScreen() {
         if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
         setTimeout(() => {
           if (currentRotationIdRef.current !== rotationId) return
-          changeViewWithTransition(nextIndex)
+          changeViewWithTransition(nextIndex, actualPlaylist)
         }, 100)
       }
 
       onFailCallbackRef.current = () => {
         if (currentRotationIdRef.current !== rotationId) return
         if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current)
-        changeViewWithTransition(nextIndex)
+        changeViewWithTransition(nextIndex, actualPlaylist)
         setTimeout(() => {
           const skipIndex = (nextIndex + 1) % actualPlaylist.tabs.length
           triggerRotation(skipIndex, true)
@@ -701,6 +722,7 @@ export default function PlayerScreen() {
 
     timerRef.current = setTimeout(() => {
       const nextIndex = (currentIndex + 1) % selectedPlaylist.tabs.length
+      playedTabsInLoopRef.current.add(currentIndex)
       triggerRotation(nextIndex)
     }, intervalMs)
 
@@ -713,12 +735,14 @@ export default function PlayerScreen() {
   const handleNext = () => {
     if (!selectedPlaylist?.tabs) return
     const nextIndex = (currentIndex + 1) % selectedPlaylist.tabs.length
+    playedTabsInLoopRef.current.delete(currentIndex)
     triggerRotation(nextIndex, true)
   }
 
   const handlePrev = () => {
     if (!selectedPlaylist?.tabs) return
     const prevIndex = (currentIndex - 1 + selectedPlaylist.tabs.length) % selectedPlaylist.tabs.length
+    playedTabsInLoopRef.current.delete(currentIndex)
     triggerRotation(prevIndex, true)
   }
 

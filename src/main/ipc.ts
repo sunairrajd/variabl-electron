@@ -155,4 +155,22 @@ export function registerIpcHandlers(getPendingAuthUrl?: () => string | null): vo
   ipcMain.handle('player-ready', (_, monitorId: number) => {
     markMonitorReady(monitorId)
   })
+
+  ipcMain.handle('track-rotation', async (_, baseUrl: string, token: string, eventData: any) => {
+    const url = 'https://tabrevolver.variabl.co/api/activity/rotation'
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(eventData)
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`Failed to track rotation: ${response.status} ${response.statusText} - ${text}`)
+    }
+    return response.json()
+  })
 }
