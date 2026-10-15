@@ -7,7 +7,7 @@ import RendererContainer from '@/components/renderers/RendererContainer'
 import { db, doc, updateDoc, onSnapshot } from '@/lib/firebase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { GradientWaveText } from '@/components/ui/gradient-wave-text'
-import { recordPlaylistRotation } from '@/services/ActivityService'
+import { recordPlaylistRotation, flushPendingRotations } from '@/services/ActivityService'
 
 const isWebsiteTab = (tab: PlaylistTab | null) => {
   if (!tab) return true;
@@ -264,6 +264,7 @@ export default function PlayerScreen() {
   }, [])
 
   const handleExit = async () => {
+    flushPendingRotations().catch(console.error)
     const searchParams = new URLSearchParams(window.location.search)
     const isSecondary = searchParams.has('monitorId')
 

@@ -54,6 +54,7 @@ export interface IpcInvokeContract {
         screenId: string | null
         playlistId: string | null
         eventId: string
+        count?: number
         timestamp: number
         date: string
       }

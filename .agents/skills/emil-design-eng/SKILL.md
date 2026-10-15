@@ -677,3 +677,10 @@ When reviewing UI code, check for:
 | Framer Motion `x`/`y` props under load     | Use `transform: "translateX()"` for hardware acceleration        |
 | Same enter/exit transition speed           | Make exit faster than enter (e.g., enter 2s, exit 200ms)         |
 | Elements all appear at once                | Add stagger delay (30-80ms between items)                        |
+
+
+git add .
+git commit -m "tracking stuff"                       
+git tag v1.5.6
+git push origin main
+git push origin v1.5.6
